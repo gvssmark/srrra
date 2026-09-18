@@ -1,6 +1,6 @@
 {
-  "name": "Indian Bank Retirees' Association — Accounts",
-  "short_name": "IBRA Accounts",
+  "name": "SRRRA Accounts",
+  "short_name": "SRRRA Accounts",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
