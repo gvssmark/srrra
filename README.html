@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Accounts App — Setup (README)</title>
+<style>
+  :root { --brand: #1a73e8; --ink: #1a1a1a; --muted: #5b6470; --bg: #fbfbfc; --card: #ffffff; --border: #e3e6ea; --code-bg: #f4f6f8; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Arial, Helvetica, sans-serif; background: var(--bg); color: var(--ink); margin: 0; line-height: 1.55; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 40px 24px 80px; }
+  header.hero { background: linear-gradient(135deg, #111827, #1a2a4a); color: #fff; padding: 40px 24px; text-align: center; }
+  header.hero h1 { margin: 0 0 6px; font-size: 24px; }
+  header.hero p { margin: 0; opacity: 0.85; font-size: 14px; }
+  h2 { font-size: 19px; margin-top: 40px; padding-bottom: 8px; border-bottom: 2px solid var(--border); color: #111; }
+  h3 { font-size: 15px; margin-top: 22px; color: #111; }
+  p, li { font-size: 14.5px; color: #2b2f36; }
+  code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 13px; font-family: "SFMono-Regular", Menlo, Consolas, monospace; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 12px 15px; border-radius: 8px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px; }
+  th, td { border: 1px solid var(--border); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: #f5f6f8; font-weight: 600; }
+  .callout { border-left: 4px solid var(--brand); background: #eef4fd; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0; font-size: 14px; }
+  .callout.warn { border-left-color: #b3261e; background: #fdecea; }
+  .callout strong { display: block; margin-bottom: 4px; }
+  ol, ul { padding-left: 22px; }
+  footer { margin-top: 50px; padding-top: 18px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>Accounts App — Setup</h1>
+  <p>A single installable web app (PWA) for Journal entry, Batch Transactions, Account Addition,
+     BSIE Reports, Ledger Reports, Accounts Report, and Financial Year Closing —
+     backed by a Google Sheet via an Apps Script Web App.</p>
+</header>
+
+<div class="wrap">
+
+  <div class="callout">
+    <strong>This codebase is organization-agnostic</strong>
+    The same <code>Code.gs</code> and <code>index.html</code> can be deployed for any organization.
+    Everything specific to one organization — its name, financial year start month, and report
+    signatory roles — lives in the Sheet's <strong>Settings</strong> tab, not in the code. See
+    Section 5 for deploying a second organization.
+  </div>
+
+  <div class="callout warn">
+    <strong>If you have an existing "old schema" Journal sheet</strong>
+    If your Journal sheet currently has columns <code>date, jrnlNo, drAccount, crAccount,
+    details, amount, finYear</code>, you're on the old schema and must migrate before deploying
+    this version of <code>Code.gs</code> — see Section 4 (Migration).
+  </div>
+
+  <h2>1. Google Sheet — four tabs, exact header rows</h2>
+  <h3>Journal <span style="font-weight:400;color:#666;">(line-item schema — one row per Dr or Cr line, not per pair)</span></h3>
+  <pre>date | jrnlNo | account | drCr | details | amount | finYear</pre>
+  <ul>
+    <li><code>drCr</code> is exactly <code>Dr</code> or <code>Cr</code>.</li>
+    <li><code>jrnlNo</code> is the <strong>voucher number</strong> — multiple rows share the same
+      jrnlNo to form one voucher. A simple transaction is 2 rows (1 Dr + 1 Cr) sharing a jrnlNo;
+      a batch/compound transaction is however many rows are needed, as long as the Dr rows and
+      Cr rows for that jrnlNo sum to the same total.</li>
+  </ul>
+
+  <h3>Accounts</h3>
+  <pre>acno | bsie | type | acname | fullacname</pre>
+
+  <h3>BSIEcodes</h3>
+  <pre>Type | mapping | Label</pre>
+  <p>
+    <code>Type</code> must be exactly one of: <code>Assets</code>, <code>Liabilities</code>,
+    <code>Expenditure</code>, <code>Income</code>. Must include <code>2-05</code> (Liabilities,
+    surplus carry-over) and <code>1-07</code> (Assets, deficit carry-over) for Financial Year
+    Closing and the BSIE report to balance.
+  </p>
+
+  <h3>Settings <span style="font-weight:400;color:#666;">(optional — sensible defaults apply if this tab or any row is missing)</span></h3>
+  <pre>Key | Value</pre>
+  <table>
+    <tr><th>Key</th><th>Meaning</th><th>Default if missing</th></tr>
+    <tr><td><code>OrgName</code></td><td>Organization name shown in the header, About page, report headings, PDF filenames, and WhatsApp share text</td><td><code>Organization</code></td></tr>
+    <tr><td><code>FYStartMonth</code></td><td>Financial year start month, 1–12 (e.g. <code>4</code> = April–March, <code>7</code> = July–June, <code>1</code> = calendar year)</td><td><code>7</code></td></tr>
+    <tr><td><code>SignatoryLabels</code></td><td>Comma-separated roles for the signature block at the end of BSIE/Ledger reports, e.g. <code>President,Secretary,Treasurer</code></td><td><code>President,General Secretary,Treasurer,Auditor</code></td></tr>
+  </table>
+
+  <h2>2. Deploy the Apps Script backend</h2>
+  <ol>
+    <li>In the Sheet: <strong>Extensions &gt; Apps Script</strong>.</li>
+    <li>Replace the code in <code>Code.gs</code> with the contents of <code>Code.gs</code> from this package.</li>
+    <li><strong>Set the admin passcode</strong>: Project Settings (gear icon) &gt; <strong>Script
+      Properties</strong> &gt; Add property: key <code>ADMIN_PASSCODE</code>, value = whatever
+      passcode you want to protect Financial Year Closing with.</li>
+    <li><strong>Deploy &gt; New deployment &gt; Web app</strong> (first time only) — Execute as:
+      <strong>Me</strong>; Who has access: <strong>Anyone</strong>.</li>
+    <li>Deploy, authorize when prompted, copy the <strong>Web app URL</strong> (ends <code>/exec</code>).</li>
+  </ol>
+  <p>Whenever you edit <code>Code.gs</code> later: <strong>Deploy &gt; Manage deployments &gt; ✎ Edit
+    &gt; New version &gt; Deploy</strong> (same <code>/exec</code> URL keeps working).</p>
+
+  <h2>3. Configure and host the app</h2>
+  <ol>
+    <li>Open <code>index.html</code>, replace <code>PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE</code> with your <code>/exec</code> URL.</li>
+    <li>Push <code>index.html</code>, <code>manifest.json</code>, <code>icon.svg</code>, <code>sw.js</code> to a GitHub repo (same folder).</li>
+    <li>Enable <strong>GitHub Pages</strong> (Settings &gt; Pages &gt; deploy from branch).</li>
+    <li>Share the resulting URL (e.g. <code>https://yourname.github.io/repo/</code>).</li>
+    <li>On a phone: open the link &gt; browser menu &gt; <strong>Add to Home Screen / Install app</strong>.</li>
+  </ol>
+
+  <h2>4. Migration (old schema → new schema)</h2>
+  <p>Only needed once, if your Journal sheet still has <code>drAccount</code>/<code>crAccount</code> columns.</p>
+  <ol>
+    <li>In the Apps Script editor, with the old <code>Code.gs</code> still in place (or paste in
+      just the <code>migrateJournalToLineItems</code> function from the new one), select
+      <code>migrateJournalToLineItems</code> in the function dropdown and click <strong>Run</strong>.</li>
+    <li>This creates a new sheet called <code>Journal_NEW</code> — your existing <code>Journal</code>
+      sheet is <strong>not</strong> touched. Check <code>Journal_NEW</code>: it should have roughly
+      double the row count of the old <code>Journal</code>.</li>
+    <li>Rename the old <code>Journal</code> sheet to <code>Journal_OLD_backup</code>.</li>
+    <li>Rename <code>Journal_NEW</code> to <code>Journal</code>.</li>
+    <li><strong>Now</strong> replace <code>Code.gs</code> with the new version and redeploy (Section 2).</li>
+  </ol>
+
+  <h2>5. Reusing this app for another organization</h2>
+  <p>
+    Since the organization's identity lives entirely in the Sheet's Settings tab, deploying a
+    second, completely independent copy for a different organization needs <strong>no code
+    changes</strong> — just:
+  </p>
+  <ol>
+    <li>Create a <strong>new Google Sheet</strong> with the four tabs (Section 1) —
+      <code>Journal</code>, <code>Accounts</code>, <code>BSIEcodes</code>, <code>Settings</code> —
+      and fill in that organization's own data (chart of accounts, BSIE code labels, and the
+      Settings row values: <code>OrgName</code>, <code>FYStartMonth</code>, <code>SignatoryLabels</code>).</li>
+    <li>In that new Sheet: <strong>Extensions &gt; Apps Script</strong>, paste in the <em>same</em>
+      <code>Code.gs</code> unchanged, set its own <code>ADMIN_PASSCODE</code>, and deploy as a Web
+      App (Section 2) — this gives a <strong>new, separate</strong> <code>/exec</code> URL, since
+      each Google Sheet needs its own Apps Script deployment.</li>
+    <li>Copy <code>index.html</code> (unchanged) into a separate folder/repo for that organization,
+      and update only the <code>WEB_APP_URL</code> line to point at the new deployment's URL.</li>
+    <li><code>manifest.json</code> (home-screen app name) and <code>icon.svg</code> are static files
+      fetched by the browser before any app code runs — these can't read the Settings tab. Edit
+      these two files by hand per organization (a one-line <code>name</code>/<code>short_name</code>
+      change, and optionally a different icon).</li>
+    <li>Host and install exactly as in Section 3, under whichever URL/repo you set up for that organization.</li>
+  </ol>
+  <p>
+    Each organization ends up with its own Google Sheet, its own Apps Script Web App URL, and its
+    own copy of <code>index.html</code>/<code>manifest.json</code>/<code>icon.svg</code> — but all
+    running the identical <code>Code.gs</code> and (apart from the <code>WEB_APP_URL</code> line)
+    identical <code>index.html</code>.
+  </p>
+
+  <h2>Access control</h2>
+  <p>
+    Reports (About, BSIE, Ledger, Accounts Report) are open to anyone with the app link — no
+    passcode needed. <strong>Journal, Batch Transactions, Account Addition, and Financial Year
+    Closing</strong> all require the same <code>ADMIN_PASSCODE</code> (the same one already used
+    for Financial Year Closing).
+  </p>
+  <ul>
+    <li>In the nav menu, those four items are hidden until unlocked. A <strong>"🔒 Unlock Data
+      Entry"</strong> link at the bottom of the menu prompts for the passcode; once verified, it
+      becomes <strong>"🔓 Lock Data Entry"</strong> and the four menu items appear.</li>
+    <li>The unlock is remembered in the browser's <code>localStorage</code>, so it persists across
+      visits until someone deliberately locks it again (or clears their browser storage) — it is
+      <strong>not</strong> re-asked every session.</li>
+    <li>This is enforced <strong>on the backend</strong>, not just by hiding buttons: every
+      Journal/Batch/Account write is checked against <code>ADMIN_PASSCODE</code> server-side
+      (<code>doPost</code> in <code>Code.gs</code>), so directly calling the API without the right
+      passcode is rejected too.</li>
+    <li><strong>What this is not</strong>: real per-person identity. Everyone who has the passcode
+      is indistinguishable to the system — there's no "logged in as X" concept and no audit trail
+      of who entered what. It's a shared secret, the same trust model as <code>ADMIN_PASSCODE</code>
+      elsewhere in this app — appropriate for a small trusted group, not a substitute for real
+      authentication.</li>
+    <li>If a stored passcode is ever rejected (e.g. the admin changed <code>ADMIN_PASSCODE</code>),
+      the app automatically re-locks that device and shows a message asking to unlock again.</li>
+  </ul>
+
+  <h2>What's inside</h2>
+  <table>
+    <tr><th>Menu item</th><th>What it does</th></tr>
+    <tr><td>About / Dos &amp; Don'ts</td><td>Landing page (default view)</td></tr>
+    <tr><td>Journal</td><td>Simple 1-debit/1-credit entry; account fields filter as you type</td></tr>
+    <tr><td>Batch Transactions</td><td>Multi-line voucher — add several Dr and/or Cr lines, post once totals balance</td></tr>
+    <tr><td>Account Addition</td><td>Add a new Account by picking a BSIE mapping (Type + acno prefix auto-derived)</td></tr>
+    <tr><td>BSIE Reports</td><td>Balance Sheet + Income &amp; Expenditure for any FY — Save PDF or Share via WhatsApp</td></tr>
+    <tr><td>Ledger Reports</td><td>Per-account transaction history + running balance for any FY, plus a Batch Transactions Summary page when viewing All Accounts — Save PDF or Share via WhatsApp</td></tr>
+    <tr><td>Accounts Report</td><td>AC / BSIE / Name / Dr count / Total Debits / Cr count / Total Credits / Balance, per account</td></tr>
+    <tr><td>Financial Year Closing</td><td>Passcode-protected. Preview then approve — posts one opening-balance voucher into the next FY</td></tr>
+  </table>
+
+  <h2>Key design notes</h2>
+  <ul>
+    <li><strong>Organization identity is data, not code</strong>: <code>OrgName</code>,
+      <code>FYStartMonth</code>, and <code>SignatoryLabels</code> all come from the Settings tab
+      and flow through the API into every heading, PDF, filename, and the WhatsApp share text —
+      <code>Code.gs</code> and <code>index.html</code> contain no organization-specific text at all.</li>
+    <li><strong>Line-item Journal</strong>: every row is one account + one amount + Dr or Cr. A
+      "voucher" is every row sharing a <code>jrnlNo</code>. This is what makes batch/compound
+      entries possible — only the voucher's Dr total and Cr total need to match, not each
+      individual line against a specific counterpart.</li>
+    <li><strong>Ledger "Particulars"</strong>: for a 2-line voucher (the simple case), shows the
+      contra account's name, same as always. For a voucher with 3+ lines (a real batch entry —
+      including the one Financial Year Closing posts), shows "Batch / Sundries" instead, per
+      standard ledger convention.</li>
+    <li><strong>Per-year scoping</strong>: reports filter the continuous Journal by <code>finYear</code>.</li>
+    <li><strong>Sign convention</strong>: Asset/Expenditure accounts are debit-normal;
+      Liability/Income accounts are credit-normal.</li>
+    <li><strong>jrnlNo resets to 1 each financial year</strong> (scoped per FY, not a global sequence).</li>
+    <li><strong>Financial Year Closing</strong> posts <strong>one voucher</strong> (one shared
+      jrnlNo): every non-zero Asset balance as a Dr line, every non-zero Liability balance (other
+      than the B/f account, BSIE code <code>2-01</code>) as a Cr line, and the B/f account itself
+      takes whichever side balances the voucher. Payment/Receipt (nominal) accounts are not
+      carried forward — they naturally start at zero. Refuses to run if the next FY already has entries.</li>
+    <li><strong>No in-app delete/purge/account-edit</strong> — by design, you handle those directly
+      in the Google Sheet.</li>
+    <li><strong>Data entry is passcode-gated; reports are open to everyone.</strong> See the
+      "Access control" section above.</li>
+    <li><strong>Journal numbers may duplicate</strong> if two people submit at nearly the same
+      moment — the app doesn't block this; fix duplicates directly in the Sheet if it happens.</li>
+    <li><strong>Dates display as dd/mm/yyyy</strong> in reports (Ledger, PDFs). The underlying data
+      and date-picker inputs still use ISO format internally — only the printed/displayed text is
+      dd/mm/yyyy.</li>
+    <li><strong>Numbers display in Indian grouping</strong> (e.g. <code>12,34,567.00</code>,
+      lakhs/crores), forced via <code>'en-IN'</code> locale regardless of the viewer's browser/device locale.</li>
+    <li><strong>Batch Transactions Summary</strong>: when viewing the Ledger with "All Accounts"
+      selected, a flat list of every line belonging to a genuine batch voucher (3+ lines) appears
+      after the per-account sections — in the PDF this is a genuinely separate page
+      (<code>doc.addPage()</code>), not just a visual break. It does not appear when viewing a
+      single account's ledger.</li>
+    <li><strong>PDF reports</strong> are drawn as real vector tables via <code>jsPDF</code> +
+      <code>jspdf-autotable</code> (not a screenshot of the page) — this avoids clipping/overflow
+      issues and produces selectable text. "Share via WhatsApp" only appears when the browser
+      supports attaching a file via the Web Share API; otherwise only "Save PDF" shows.</li>
+    <li><strong>PWA</strong>: installable via <code>manifest.json</code> + <code>sw.js</code>; the
+      service worker only caches the app shell (HTML/CSS/JS) for offline loading — it does not
+      queue offline Journal/Batch submissions. You still need connectivity to actually save data
+      or load reports.</li>
+  </ul>
+
+  <h2>Easy tweaks</h2>
+  <ul>
+    <li><strong>Financial year start month</strong>: edit <code>FYStartMonth</code> in the Settings
+      tab — no code change needed (Section 1).</li>
+    <li><strong>The "YYYY-YY" finYear label format itself</strong> (as opposed to which month it
+      starts in): change <code>finYearFromDate_()</code> / <code>nextFinYear_()</code>.</li>
+    <li><strong>Change admin passcode</strong>: edit the <code>ADMIN_PASSCODE</code> Script Property — no redeploy needed.</li>
+    <li><strong>Ledger "Batch / Sundries" wording</strong>: change the string in <code>getLedgerData()</code>.</li>
+  </ul>
+
+</div>
+<footer>Accounts App — README, rendered as HTML for readability.</footer>
+</body>
+</html>

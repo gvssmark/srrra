@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IBRA Accounts App — Technical Handover</title>
+<style>
+  :root { --brand: #1a73e8; --ink: #1a1a1a; --muted: #5b6470; --bg: #fbfbfc; --card: #ffffff; --border: #e3e6ea; --code-bg: #f4f6f8; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Arial, Helvetica, sans-serif;
+    background: var(--bg); color: var(--ink); margin: 0; line-height: 1.55;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+  header.hero {
+    background: linear-gradient(135deg, #111827, #1a2a4a); color: #fff;
+    padding: 46px 24px; text-align: center;
+  }
+  header.hero h1 { margin: 0 0 8px; font-size: 26px; }
+  header.hero p { margin: 0; opacity: 0.85; font-size: 14px; }
+  h2 { font-size: 20px; margin-top: 46px; padding-bottom: 8px; border-bottom: 2px solid var(--border); color: #111; }
+  h3 { font-size: 15.5px; margin-top: 28px; color: #111; }
+  p, li { font-size: 14.5px; color: #2b2f36; }
+  .muted { color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin: 14px 0; }
+  .callout {
+    border-left: 4px solid var(--brand); background: #eef4fd; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0;
+    font-size: 14px;
+  }
+  .callout.warn { border-left-color: #b3261e; background: #fdecea; }
+  .callout strong { display: block; margin-bottom: 4px; }
+  code, .code-inline { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 13px; font-family: "SFMono-Regular", Menlo, Consolas, monospace; }
+  pre {
+    background: #0f172a; color: #e2e8f0; padding: 14px 16px; border-radius: 8px; overflow-x: auto;
+    font-size: 12.5px; line-height: 1.5;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px; }
+  th, td { border: 1px solid var(--border); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: #f5f6f8; font-weight: 600; }
+  .arch-diagram { display: flex; flex-direction: column; gap: 10px; margin: 18px 0; }
+  .arch-box {
+    border: 1.5px solid var(--brand); border-radius: 8px; padding: 12px 16px; background: #f7faff;
+  }
+  .arch-box .label { font-weight: 700; font-size: 13.5px; color: var(--brand); }
+  .arch-box .desc { font-size: 13px; color: #444; margin-top: 3px; }
+  .arch-arrow { text-align: center; color: var(--muted); font-size: 13px; }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 700; background: #eef4fd; color: var(--brand); margin-left: 6px; }
+  .toc { columns: 2; column-gap: 30px; font-size: 13.5px; }
+  .toc li { margin-bottom: 4px; }
+  .toc a { color: var(--brand); text-decoration: none; }
+  footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--muted); text-align: center; }
+  @media (max-width: 600px) { .toc { columns: 1; } }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>Indian Bank Retirees' Association — Accounts App</h1>
+  <p>Technical handover document — architecture, design decisions, and how to continue development</p>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <strong>Contents</strong>
+    <ul class="toc">
+      <li><a href="#overview">1. What this app is</a></li>
+      <li><a href="#architecture">2. Architecture</a></li>
+      <li><a href="#sheet">3. The Google Sheet</a></li>
+      <li><a href="#backend">4. Backend — Code.gs</a></li>
+      <li><a href="#frontend">5. Frontend — index.html</a></li>
+      <li><a href="#pdf">6. PDF report generation</a></li>
+      <li><a href="#pwa">7. PWA packaging</a></li>
+      <li><a href="#deploy">8. Deployment &amp; redeployment</a></li>
+      <li><a href="#security">9. Security &amp; access model</a></li>
+      <li><a href="#limitations">10. Known limitations</a></li>
+      <li><a href="#files">11. File manifest</a></li>
+      <li><a href="#continuing">12. Continuing development with Claude</a></li>
+    </ul>
+  </div>
+
+  <h2 id="overview">1. What this app is</h2>
+  <p>
+    A small accounting system for IBRA covering double-entry Journal data entry, a chart of Accounts,
+    and reporting (Ledger, Balance Sheet &amp; Income/Expenditure, an Accounts summary), plus an
+    end-of-year closing workflow. It replaced a set of manually maintained Google Sheets — one per
+    financial year — with a single continuous Journal and Accounts sheet, entered through a small
+    installable web app instead of typing directly into cells.
+  </p>
+  <p>
+    It was built incrementally through conversation with Claude, evolving from "add a data-entry form
+    to my spreadsheet" into a full multi-view Progressive Web App (PWA) with reporting, PDF export, and
+    a year-end closing procedure.
+  </p>
+
+  <h2 id="architecture">2. Architecture</h2>
+  <p>Three layers, deliberately kept simple — no database, no server you have to manage:</p>
+  <div class="arch-diagram">
+    <div class="arch-box">
+      <div class="label">Google Sheet <span class="badge">data store</span></div>
+      <div class="desc">Four tabs: Journal, Accounts, BSIEcodes, Settings. This is the single source of truth.</div>
+    </div>
+    <div class="arch-arrow">↕ read / write via Apps Script</div>
+    <div class="arch-box">
+      <div class="label">Apps Script Web App <span class="badge">Code.gs</span></div>
+      <div class="desc">Deployed as a Web App (a public <code>/exec</code> URL). Exposes a small JSON API
+        (<code>doGet</code>/<code>doPost</code>) that the frontend calls. Runs "as Me" (the Sheet owner),
+        so it can read/write the Sheet regardless of who is using the app.</div>
+    </div>
+    <div class="arch-arrow">↕ fetch() over HTTPS</div>
+    <div class="arch-box">
+      <div class="label">Static PWA <span class="badge">index.html on GitHub Pages</span></div>
+      <div class="desc">A single-page app — no build step, no framework, no npm install. Plain HTML/CSS/JS
+        in one file, hosted as a static site. This is what people actually open on their phones.</div>
+    </div>
+  </div>
+  <div class="callout">
+    <strong>Why this shape?</strong>
+    No server to pay for or maintain, no login system to build, and anyone with basic Apps Script/GitHub
+    access can maintain it. The trade-off is discussed in <a href="#security">Section 9</a> — there's no
+    real access control.
+  </div>
+
+  <h2 id="sheet">3. The Google Sheet</h2>
+  <h3>Journal — line-item schema (one row per Dr or Cr line)</h3>
+  <div class="callout">
+    <strong>This schema changed after the app's first version</strong>
+    The original design was one row per transaction, with separate
+    <code>drAccount</code>/<code>crAccount</code> columns — that only supports a simple
+    1-debit/1-credit transaction. To support batch/compound transactions (e.g. several expense
+    claims paid out via a couple of cheques that don't match 1:1), the schema was changed to a
+    <strong>line-item model</strong>: every row is a single line (one account, one amount, tagged
+    Dr or Cr), and a "voucher" is a group of rows sharing the same <code>jrnlNo</code>. See
+    Section 4 for how this works and how existing data was migrated.
+  </div>
+  <table>
+    <tr><th>Column</th><th>Meaning</th></tr>
+    <tr><td><code>date</code></td><td>Transaction date — shared by every line in a voucher</td></tr>
+    <tr><td><code>jrnlNo</code></td><td>The <strong>voucher number</strong>. Resets to 1 at the start of each financial year. Multiple rows sharing a jrnlNo form one voucher. Duplicates within a year are tolerated; corrected manually if needed.</td></tr>
+    <tr><td><code>account</code></td><td>Full account name (e.g. <code>1004-BANK ACCOUNT NO 465693063</code>), must match an entry in Accounts exactly</td></tr>
+    <tr><td><code>drCr</code></td><td>Exactly <code>Dr</code> or <code>Cr</code> — which side of this line's account this amount hits</td></tr>
+    <tr><td><code>details</code></td><td>Free-text narration for this line</td></tr>
+    <tr><td><code>amount</code></td><td>This line's amount</td></tr>
+    <tr><td><code>finYear</code></td><td>e.g. <code>2025-26</code>. This is what all reporting filters on — the Journal is one continuous sheet across all years, not one file per year.</td></tr>
+  </table>
+  <p>
+    A <strong>simple transaction</strong> is a 2-line voucher (1 Dr line + 1 Cr line, same amount)
+    — this is what the "Journal" menu produces. A <strong>batch/compound transaction</strong> is a
+    voucher with more lines, where only the <em>totals</em> must balance
+    (sum of Dr lines = sum of Cr lines for that jrnlNo) — not each line paired 1:1 against a
+    specific contra account. This is what the "Batch Transactions" menu produces.
+  </p>
+
+  <h3>Accounts — the chart of accounts</h3>
+  <table>
+    <tr><th>Column</th><th>Meaning</th></tr>
+    <tr><td><code>acno</code></td><td>4-digit account number. First digit is fixed by type: <code>1</code>=Asset, <code>2</code>=Liability, <code>3</code>=Payment (Expenditure), <code>4</code>=Receipt (Income)</td></tr>
+    <tr><td><code>bsie</code></td><td>The BSIE mapping code this account rolls up into, e.g. <code>1-04</code></td></tr>
+    <tr><td><code>type</code></td><td><code>ASSET</code> / <code>LIABILITY</code> / <code>PAYMENT</code> / <code>RECEIPT</code> — derived automatically from the chosen BSIE mapping when the account is created, not entered separately</td></tr>
+    <tr><td><code>acname</code></td><td>Account name</td></tr>
+    <tr><td><code>fullacname</code></td><td>Computed as <code>acno-acname</code>; this is the value used everywhere else (Journal, reports) to reference an account</td></tr>
+  </table>
+
+  <h3>BSIEcodes — report structure &amp; labels</h3>
+  <table>
+    <tr><th>Column</th><th>Meaning</th></tr>
+    <tr><td><code>Type</code></td><td>One of <code>Assets</code>, <code>Liabilities</code>, <code>Expenditure</code>, <code>Income</code></td></tr>
+    <tr><td><code>mapping</code></td><td>The code, e.g. <code>2-05</code></td></tr>
+    <tr><td><code>Label</code></td><td>The printed label for that line on the BSIE report, e.g. "Excess of Income over Expenditure Carried over"</td></tr>
+  </table>
+  <p>
+    This sheet is the authoritative source for how the Balance Sheet &amp; Income/Expenditure report is
+    structured — every code present here shows as a line on the report, even with a zero balance,
+    matching how the original manually-maintained spreadsheet looked.
+  </p>
+  <div class="callout warn">
+    <strong>Two codes are load-bearing, not decorative</strong>
+    <code>2-05</code> (Liabilities) and <code>1-07</code> (Assets) are used by the app as computed
+    surplus/deficit "plug" lines — the app writes into these automatically at report time so the
+    Balance Sheet balances. Deleting them will break the balance check. Similarly <code>3-10</code>
+    and <code>4-06</code> are the equivalent plug lines on the Income &amp; Expenditure statement.
+  </div>
+
+  <h3>Settings — organization identity <span style="font-weight:400;color:#666;">(optional — sensible defaults apply if missing)</span></h3>
+  <table>
+    <tr><th>Column</th><th>Meaning</th></tr>
+    <tr><td colspan="2"><code>Key | Value</code> rows</td></tr>
+  </table>
+  <table>
+    <tr><th>Key</th><th>Meaning</th><th>Default</th></tr>
+    <tr><td><code>OrgName</code></td><td>Shown in the header, About page, every report heading, PDF filenames, and WhatsApp share text</td><td><code>Organization</code></td></tr>
+    <tr><td><code>FYStartMonth</code></td><td>1–12 (e.g. <code>4</code>=April–March, <code>7</code>=July–June, <code>1</code>=calendar year)</td><td><code>7</code></td></tr>
+    <tr><td><code>SignatoryLabels</code></td><td>Comma-separated roles for the report signature block, e.g. <code>President,Secretary,Treasurer</code></td><td><code>President,General Secretary,Treasurer,Auditor</code></td></tr>
+  </table>
+  <div class="callout">
+    <strong>This is what makes the app reusable across organizations</strong>
+    <code>Code.gs</code> and <code>index.html</code> contain no organization-specific text —
+    everything about "which organization is this" comes from this one tab. See Section 4a for how
+    a second organization is deployed with the identical codebase.
+  </div>
+
+  <h2 id="backend">4. Backend — Code.gs</h2>
+
+  <h3>Migrating from the old schema</h3>
+  <p>
+    <code>Code.gs</code> includes a one-time function, <code>migrateJournalToLineItems()</code>,
+    meant to be run manually from the Apps Script editor (not exposed via the Web App). It reads
+    the old-format Journal, writes the converted line-item rows into a new sheet called
+    <code>Journal_NEW</code> — leaving the original untouched — and the administrator then renames
+    the sheets to swap them in once satisfied. Full step-by-step is in <code>README.md</code>
+    Section 4.
+  </p>
+
+  <h3>Batch Transactions (multi-line vouchers)</h3>
+  <p>
+    <code>submitBatchJournal(entry)</code> takes <code>{date, finYear, lines: [{account, drCr,
+    details, amount}, ...]}</code>, validates at least one Dr line and one Cr line, validates
+    every account exists, validates the Dr total equals the Cr total, then writes all lines as one
+    atomic batch (a single <code>setValues()</code> call) sharing one new <code>jrnlNo</code>. The
+    simple <code>submitJournalEntry(entry)</code> (used by the "Journal" menu) is really just a
+    2-line special case of the same underlying model, written directly rather than routed through
+    the batch function.
+  </p>
+  <p>
+    A single Apps Script file deployed as a Web App. It has no database of its own — every call reads
+    the Sheet fresh, computes what's needed, and (for writes) appends rows. Key design points:
+  </p>
+  <h3>Sign convention</h3>
+  <p>
+    Matches standard double-entry accounting, inferred from the original spreadsheet's numbers:
+    Asset and Payment (expenditure) accounts are <strong>debit-normal</strong>
+    (<code>balance = totalDebits − totalCredits</code>); Liability and Receipt (income) accounts are
+    <strong>credit-normal</strong> (<code>balance = totalCredits − totalDebits</code>).
+  </p>
+  <h3>Per-financial-year scoping</h3>
+  <p>
+    Even though the Journal is one continuous sheet, every report (<code>Ledger</code>, <code>BSIE</code>,
+    <code>Accounts Report</code>) filters strictly to the selected <code>finYear</code>. This reproduces
+    what the old per-year spreadsheet files showed, because the opening-balance entry for each year is
+    itself a normal Journal row dated 1 July of that year.
+  </p>
+  <h3>Journal numbering</h3>
+  <p>
+    <code>jrnlNo</code> is computed as "highest existing number for this <code>finYear</code>, plus one" —
+    scoped per year, not a global running count. It resets to 1 automatically each time a new financial
+    year starts (there's no explicit "reset" step; it falls out naturally from the per-year scoping).
+  </p>
+  <h3>Financial Year Closing</h3>
+  <p>
+    Two-step: <code>previewCloseFinancialYear(finYear)</code> (read-only — computes what
+    <em>would</em> be posted) and <code>closeFinancialYear(finYear, passcode)</code> (writes it). It
+    posts <strong>one voucher</strong> (one shared jrnlNo): every non-zero Asset balance becomes a Dr
+    line, every non-zero Liability balance (other than the B/f account itself) becomes a Cr line,
+    and the account mapped to BSIE code <code>2-01</code> takes whichever side balances the voucher
+    — dated 1 July of the next FY. Payment/Receipt (nominal) accounts are <em>not</em> carried
+    forward — they start the new year at zero simply because the Journal filter excludes prior
+    years. It refuses to run if the next FY already has any entries, to prevent duplicate opening
+    balances. Because this voucher naturally has many lines, it reads as "Batch / Sundries" in the
+    Ledger, same as any other batch entry.
+  </p>
+  <h3>Admin passcode &amp; data-entry access control</h3>
+  <p>
+    Stored as an Apps Script <strong>Script Property</strong> named <code>ADMIN_PASSCODE</code> — not in
+    the code itself, so it survives redeployments and can be changed without touching <code>Code.gs</code>.
+    Originally this only gated Financial Year Closing; it now also gates <strong>every Journal,
+    Batch Transactions, and Account Addition write</strong> — see Section 9 for how the unlock flow
+    works. There's still no other in-app admin function by design — deleting a Journal entry,
+    purging old years, or editing Accounts is done directly in the Sheet.
+  </p>
+
+  <h3>Reusing this codebase for a second organization</h3>
+  <p>
+    Because organization identity lives in the Settings sheet (Section 3), not in code, a second
+    organization needs no code changes: a new Google Sheet with the same four tabs, a fresh Apps
+    Script deployment (new <code>/exec</code> URL — each Sheet needs its own), and a copy of
+    <code>index.html</code> with only its <code>WEB_APP_URL</code> line changed. The one exception
+    is <code>manifest.json</code>/<code>icon.svg</code> — static files fetched before any app code
+    runs, so the home-screen name/icon still need a one-line manual edit per deployment. Full
+    steps are in <code>README.md</code> Section 5.
+  </p>
+
+  <h3>API surface</h3>
+  <table>
+    <tr><th>Action</th><th>Method</th><th>Purpose</th></tr>
+    <tr><td><code>journalForm</code></td><td>GET</td><td>Form init data: current FY, next jrnlNo, account list</td></tr>
+    <tr><td><code>journal</code></td><td>POST</td><td>Submit a Journal entry (passcode required)</td></tr>
+    <tr><td><code>batchJournal</code></td><td>POST</td><td>Submit a multi-line batch voucher (passcode required)</td></tr>
+    <tr><td><code>accountsForm</code></td><td>GET</td><td>BSIE mapping list for the Account Addition form</td></tr>
+    <tr><td><code>nextAcno</code></td><td>GET</td><td>Suggests the next free account number for a type</td></tr>
+    <tr><td><code>account</code></td><td>POST</td><td>Submit a new Account (passcode required)</td></tr>
+    <tr><td><code>finYears</code></td><td>GET</td><td>List of financial years present in the Journal</td></tr>
+    <tr><td><code>ledger</code></td><td>GET</td><td>Per-account transaction history + running balance</td></tr>
+    <tr><td><code>bsie</code></td><td>GET</td><td>Balance Sheet + Income/Expenditure for a FY</td></tr>
+    <tr><td><code>accountsReport</code></td><td>GET</td><td>AC / BSIE / Name / Dr count / Total Debits / Cr count / Total Credits / Balance, per account</td></tr>
+    <tr><td><code>orgSettings</code></td><td>GET</td><td>OrgName, FYStartMonth, SignatoryLabels — fetched once at app boot</td></tr>
+    <tr><td><code>checkPasscode</code></td><td>GET</td><td>Non-throwing boolean check, used by the "Unlock Data Entry" flow</td></tr>
+    <tr><td><code>closeYearPreview</code></td><td>GET</td><td>Read-only preview of Financial Year Closing</td></tr>
+    <tr><td><code>closeYear</code></td><td>POST</td><td>Executes Financial Year Closing (passcode required)</td></tr>
+  </table>
+
+  <h2 id="frontend">5. Frontend — index.html</h2>
+  <p>
+    A single static HTML file — no build tools, no bundler. It's a hand-rolled single-page app:
+  </p>
+  <ul>
+    <li><strong>Hash-based router</strong> (<code>#journal</code>, <code>#bsie?fy=2025-26</code>, etc.) —
+      a plain object mapping route names to render functions.</li>
+    <li><strong>Hamburger nav</strong> with six views: About/Dos&amp;Don'ts (default landing page), Journal,
+      Account Addition, BSIE Reports, Ledger Reports, Accounts Report, Financial Year Closing.</li>
+    <li><strong>Custom autocomplete</strong> for the Journal's Debit/Credit account fields — filters as
+      you type against the loaded account list, rather than a plain dropdown.</li>
+    <li>All data comes from the Apps Script Web App via <code>fetch()</code>. POST requests deliberately
+      use <code>Content-Type: text/plain</code> (not <code>application/json</code>) — this avoids a CORS
+      preflight request that Apps Script Web Apps don't handle, while the server still parses the body
+      as JSON.</li>
+  </ul>
+  <p>
+    One config line at the top of the <code>&lt;script&gt;</code> block —
+    <code>const WEB_APP_URL = '...'</code> — points the whole frontend at your Apps Script deployment.
+    This is the one thing that must be updated whenever the Apps Script deployment URL changes.
+  </p>
+
+  <h2 id="pdf">6. PDF report generation</h2>
+  <p>
+    This went through two approaches worth knowing about, because the first one's failure shaped the
+    final design:
+  </p>
+  <h3>Attempt 1 — html2canvas + jsPDF's <code>doc.html()</code> <span class="muted">(abandoned)</span></h3>
+  <p>
+    The first approach rendered the on-screen report by screenshotting the live DOM
+    (<code>html2canvas</code>) and embedding that image into a PDF. In practice this produced clipped
+    columns, cut-off text, and garbled/duplicated content at page breaks on the multi-column BSIE
+    statement — <code>html2canvas</code> doesn't reliably handle complex CSS table layouts, especially
+    the side-by-side two-statement table this report needed.
+  </p>
+  <h3>Attempt 2 — jsPDF + jspdf-autotable <span class="muted">(current, working)</span></h3>
+  <p>
+    The current approach draws the PDF programmatically — real vector text, lines, and cells via
+    <code>doc.autoTable(...)</code> — instead of rasterizing the page. There's no "container width" to
+    get wrong and nothing to clip, because every cell is placed explicitly. It also produces genuinely
+    selectable/searchable text, which the screenshot approach never could.
+  </p>
+  <div class="callout">
+    <strong>Design note for future reports</strong>
+    Any new PDF report added to this project (or any future project) should follow this same pattern —
+    <code>jsPDF</code> + <code>jspdf-autotable</code>, drawing tables directly, not screenshotting a
+    rendered page. This is saved as a standing preference in the account that built this app; if you're
+    working from a different Claude account, it's worth stating this preference yourself early on (see
+    Section 12).
+  </div>
+  <p>Reports each go through a small shared toolkit of helper functions in <code>index.html</code>:</p>
+  <ul>
+    <li><code>pdfSectionTitleBar_()</code> — draws the black title bars (e.g. "ASSETS AND LIABILITIES AS ON 30/06/2026")</li>
+    <li><code>pdfTwoColStatement_()</code> — draws two tables side-by-side with a shared start Y, so their
+      Total rows land on the same line without relying on matching row heights</li>
+    <li><code>pdfSignatories_()</code> — draws the President / General Secretary / Treasurer / Auditor
+      signature line block used at the end of BSIE and Ledger reports</li>
+  </ul>
+  <p>
+    "Save PDF" always downloads the file. "Share via WhatsApp" only appears when the browser genuinely
+    supports attaching a file via the Web Share API (<code>navigator.canShare({files:...})</code>) — a
+    real file gets attached, not just a link; on browsers without that support the button is hidden
+    entirely rather than offering a broken experience.
+  </p>
+
+  <h2 id="pwa">7. PWA packaging</h2>
+  <p>
+    <code>manifest.json</code> and <code>sw.js</code> make the app installable to a phone's home screen.
+    The service worker is intentionally minimal — it caches the app shell (HTML/CSS/JS/icon) for fast
+    loading, but it does <strong>not</strong> queue offline Journal submissions. Data entry and reports
+    still require an internet connection to actually reach the Apps Script backend.
+  </p>
+
+  <h2 id="deploy">8. Deployment &amp; redeployment</h2>
+  <p>Full step-by-step is in <code>README.md</code> alongside the code; the short version:</p>
+  <ol>
+    <li>Google Sheet has the four tabs with exact header rows (Section 3).</li>
+    <li><code>Code.gs</code> pasted into Extensions &gt; Apps Script, <code>ADMIN_PASSCODE</code> set as a
+      Script Property, deployed as a Web App (Execute as: Me, Who has access: Anyone).</li>
+    <li><code>WEB_APP_URL</code> in <code>index.html</code> updated to that deployment's <code>/exec</code> URL.</li>
+    <li><code>index.html</code>, <code>manifest.json</code>, <code>icon.svg</code>, <code>sw.js</code> pushed
+      together to a GitHub repo with Pages enabled.</li>
+  </ol>
+  <p>
+    <strong>To change backend code later:</strong> Deploy &gt; Manage deployments &gt; edit the existing
+    deployment &gt; New version &gt; Deploy. This keeps the same <code>/exec</code> URL, so
+    <code>index.html</code> doesn't need updating.<br>
+    <strong>To change frontend code:</strong> just push the updated <code>index.html</code> to GitHub —
+    no redeploy step needed on the Apps Script side.
+  </p>
+
+  <h2 id="security">9. Security &amp; access model</h2>
+  <div class="callout warn">
+    <strong>There is still no per-person login system — but data entry is now passcode-gated.</strong>
+    Reports (About, BSIE, Ledger, Accounts Report) are open to anyone with the link, with no
+    passcode. Journal, Batch Transactions, Account Addition, and Financial Year Closing all require
+    the same <code>ADMIN_PASSCODE</code>. This is still a shared-secret model, not real
+    authentication — it was a deliberate trade-off, consistent with keeping this a small-committee
+    tool rather than building full auth.
+  </div>
+  <ul>
+    <li><strong>How the unlock works:</strong> in the nav menu, the four data-entry items are hidden
+      behind a <code>data-protected="1"</code> attribute until unlocked. A "🔒 Unlock Data Entry"
+      link prompts for the passcode, verifies it via the non-throwing <code>checkPasscode</code> GET
+      action, and on success stores the passcode itself in the browser's <code>localStorage</code>
+      (key <code>entryPasscode</code>) — this is what makes the unlock persist across visits rather
+      than needing re-entry every session.</li>
+    <li><strong>Enforced server-side, not just hidden client-side:</strong> <code>doPost</code> in
+      <code>Code.gs</code> calls <code>checkPasscode_()</code> before <code>submitJournalEntry</code>,
+      <code>submitBatchJournal</code>, or <code>submitAccountEntry</code> run — a direct API call
+      without the right passcode is rejected regardless of what the UI shows.</li>
+    <li>If a stored passcode is later rejected (e.g. an admin rotates <code>ADMIN_PASSCODE</code>),
+      the frontend's <code>handleWriteError_()</code> detects the "Incorrect passcode" message, clears
+      the stored value, and re-locks that device automatically.</li>
+    <li><code>ADMIN_PASSCODE</code> is a plain Script Property — visible to anyone with edit access
+      to the Apps Script project — so treat it as a shared PIN, not a real secret. Route guarding in
+      the frontend router also blocks direct hash navigation (e.g. typing <code>#journal</code> in
+      the URL bar) to a protected view while locked.</li>
+    <li>No in-app delete, purge, or account-editing UI exists <em>by design</em> — those are handled by an
+      administrator editing the Google Sheet directly.</li>
+    <li>Journal numbers can duplicate if two people submit around the same moment — accepted as fine,
+      correctable manually in the Sheet if it ever matters.</li>
+  </ul>
+
+  <h2 id="limitations">10. Known limitations</h2>
+  <ul>
+    <li>No page-number auto-counting in printed reports — browsers don't reliably support this without
+      extra tooling; the Ledger's running header shows the report label and generation date instead.</li>
+    <li>No offline write queueing (see Section 7).</li>
+    <li>"Share via WhatsApp" depends on browser support for file-sharing via the Web Share API — mainly
+      Chrome on Android today. It degrades gracefully (button simply doesn't appear) elsewhere.</li>
+    <li>The BSIEcodes sheet's <code>2-05</code>/<code>1-07</code>/<code>3-10</code>/<code>4-06</code> codes
+      are structurally required for the balance-check plug logic (Section 3) — removing them will break
+      report balancing, not just cosmetics.</li>
+    <li>Dates display as dd/mm/yyyy and numbers use Indian lakh/crore grouping (<code>'en-IN'</code>
+      locale) throughout reports — this is deliberate, not a bug, and hardcoded rather than a
+      user-configurable setting.</li>
+    <li>The Ledger's "Batch Transactions Summary" page only appears when viewing All Accounts, and
+      only in the printed/PDF output as a genuinely separate page — it's a normal (non-paginated)
+      section when viewed on screen.</li>
+  </ul>
+
+  <h2 id="files">11. File manifest</h2>
+  <table>
+    <tr><th>File</th><th>What it is</th></tr>
+    <tr><td><code>Code.gs</code></td><td>Apps Script backend — deployed as the Web App</td></tr>
+    <tr><td><code>index.html</code></td><td>The entire frontend PWA — one file, all views</td></tr>
+    <tr><td><code>manifest.json</code></td><td>PWA manifest (name, icon, install behavior)</td></tr>
+    <tr><td><code>sw.js</code></td><td>Service worker — app-shell caching for installability</td></tr>
+    <tr><td><code>icon.svg</code></td><td>App icon</td></tr>
+    <tr><td><code>README.md</code></td><td>Step-by-step setup/deployment instructions (source of truth, GitHub-friendly)</td></tr>
+    <tr><td><code>README.html</code></td><td>The same setup instructions, rendered as a styled standalone page for easier reading</td></tr>
+  </table>
+
+  <h2 id="continuing">12. Continuing development with Claude</h2>
+  <p>To pick up development, a new administrator just needs to:</p>
+  <ol>
+    <li>Open a new conversation with Claude (any Claude account/plan that supports file uploads and
+      artifacts works).</li>
+    <li>Upload the current <code>Code.gs</code>, <code>index.html</code>, and this handover document for
+      context.</li>
+    <li>Describe the change wanted — Claude can read the existing code and extend it in the same
+      patterns described above (e.g. add a new report by following the same <code>doGet</code> action +
+      vector PDF builder pattern used for the Accounts Report).</li>
+  </ol>
+  <div class="callout warn">
+    <strong>Memory does not transfer between Claude accounts</strong>
+    The "always use <code>jsPDF</code> + <code>jspdf-autotable</code> for PDF reports, never
+    screenshot-based generation" preference was saved in the <em>previous</em> administrator's Claude
+    account memory. A new administrator using their own account won't have that context automatically —
+    it's worth restating it explicitly in the first conversation (or asking Claude to save it to their
+    own memory, if that feature is enabled for their account) so future PDF work follows the same
+    reliable pattern rather than re-discovering the same screenshot-clipping problem from scratch.
+  </div>
+
+</div>
+
+<footer>
+  IBRA Accounts App — handover document generated to support administrator transition.
+</footer>
+
+</body>
+</html>

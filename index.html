@@ -1,0 +1,1332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Accounts</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1a73e8">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root { --brand: #1a73e8; --brand-dark: #0d47a1; --bg: #f5f6f8; --border: #e0e0e0; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; margin: 0; background: var(--bg); color: #222; font-size: 14px; }
+
+  /* ---- Header / Nav ---- */
+  header.topbar {
+    background: var(--brand); color: #fff; display: flex; align-items: center;
+    padding: 10px 12px; position: sticky; top: 0; z-index: 100; gap: 10px;
+  }
+  header.topbar h1 { font-size: 16px; margin: 0; font-weight: 600; line-height: 1.2; }
+  header.topbar .sub { font-size: 11px; opacity: 0.85; }
+  #hamburger {
+    background: none; border: none; color: #fff; font-size: 22px; cursor: pointer; padding: 4px 8px;
+  }
+  #sideNav {
+    position: fixed; top: 0; left: -280px; width: 260px; height: 100%; background: #fff;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.2); transition: left 0.2s ease; z-index: 200; overflow-y: auto;
+  }
+  #sideNav.open { left: 0; }
+  #sideNav .navHeader { background: var(--brand-dark); color: #fff; padding: 18px 16px; }
+  #sideNav .navHeader div.name { font-weight: bold; font-size: 15px; }
+  #sideNav a {
+    display: block; padding: 14px 18px; text-decoration: none; color: #222; border-bottom: 1px solid #f0f0f0;
+  }
+  #sideNav a.active { background: #eaf1fd; color: var(--brand); font-weight: bold; }
+  #sideNav a[data-protected="1"].locked-hidden { display: none; }
+  #sideNav a#navLockToggle { color: #666; font-size: 13px; border-top: 2px solid #eee; margin-top: 8px; }
+  #navOverlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 150;
+  }
+  #navOverlay.open { display: block; }
+
+  main { max-width: 960px; margin: 0 auto; padding: 16px; }
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  h2 { margin: 0 0 4px; font-size: 19px; }
+  h3 { margin: 20px 0 8px; font-size: 15px; }
+  label { display: block; font-weight: bold; margin-top: 12px; font-size: 12px; color: #444; }
+  input, select, textarea {
+    width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; font-size: 14px;
+    border: 1px solid #ccc; border-radius: 5px; font-family: inherit;
+  }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 140px; }
+  .hint { color: #777; font-size: 11px; margin-top: 3px; }
+  button.btn {
+    padding: 9px 16px; font-size: 14px; border: none; border-radius: 5px;
+    background: var(--brand); color: #fff; cursor: pointer; margin-top: 14px; margin-right: 8px;
+  }
+  button.btn.secondary { background: #eee; color: #333; }
+  button.btn.danger { background: #c0392b; }
+  button.btn:disabled { background: #999; cursor: default; }
+  .msg-error { color: #c0392b; margin-top: 10px; white-space: pre-wrap; font-size: 13px; }
+  .msg-ok { color: #0a7a2f; margin-top: 10px; font-size: 13px; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-left: 8px; }
+  .badge.ok { background: #e6f4ea; color: #0a7a2f; }
+  .badge.bad { background: #fce8e6; color: #c0392b; }
+
+  /* autocomplete */
+  .ac-wrap { position: relative; }
+  .ac-list {
+    position: absolute; left: 0; right: 0; top: 100%; background: #fff; border: 1px solid #ccc;
+    border-top: none; max-height: 220px; overflow-y: auto; z-index: 50; border-radius: 0 0 5px 5px; display: none;
+  }
+  .ac-list div { padding: 8px 10px; cursor: pointer; font-size: 13px; }
+  .ac-list div:hover, .ac-list div.hl { background: #eaf1fd; }
+
+  /* tables / reports */
+  table.report { width: 100%; border-collapse: collapse; }
+  table.report th, table.report td { padding: 6px 8px; font-size: 13px; border-bottom: 1px solid #f0f0f0; text-align: right; }
+  table.report th:first-child, table.report td:first-child,
+  table.report th:nth-child(2), table.report td:nth-child(2) { text-align: left; }
+  table.report thead th { background: #fafafa; font-size: 11px; text-transform: uppercase; color: #666; }
+  .subtotal td { font-weight: bold; border-top: 1px solid #bbb; }
+  .grand-total td { font-weight: bold; font-size: 14px; border-top: 2px solid #333; background: #f7f7f7; }
+  .group-label td { font-weight: bold; background: #fafafa; }
+  .table-wrap { overflow-x: auto; }
+  .account-block { margin-bottom: 22px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .account-header {
+    background: #f5f5f5; padding: 8px 12px; font-weight: bold; display: flex; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .cols { display: flex; gap: 20px; flex-wrap: wrap; }
+  .cols > .col { flex: 1; min-width: 280px; }
+
+  /* report headings */
+  .org-heading-bar {
+    background: #111; color: #fff; text-align: center; font-weight: bold; font-size: 16px;
+    padding: 8px; margin-bottom: 10px; border-radius: 4px;
+  }
+  .report-subheading { text-align: center; font-weight: bold; font-size: 13px; margin-bottom: 14px; color: #333; }
+  .section-title-bar {
+    background: #111; color: #fff; text-align: center; font-weight: bold; font-size: 13px;
+    padding: 5px; margin: 16px 0 0; border-radius: 3px 3px 0 0;
+  }
+
+  /* side-by-side BSIE statement table */
+  table.bsie-table { width: 100%; border-collapse: collapse; border: 1px solid #333; margin-bottom: 4px; table-layout: fixed; }
+  table.bsie-table th, table.bsie-table td {
+    padding: 5px 7px; font-size: 12px; border-bottom: 1px solid #eee;
+    overflow-wrap: break-word; word-break: break-word; white-space: normal;
+  }
+  table.bsie-table th { background: #f2f2f2; text-align: left; font-size: 11px; text-transform: uppercase; color: #555; }
+  table.bsie-table th:nth-child(1), table.bsie-table td:nth-child(1),
+  table.bsie-table th:nth-child(4), table.bsie-table td:nth-child(4) { width: 8%; color: #555; }
+  table.bsie-table th:nth-child(2), table.bsie-table td:nth-child(2),
+  table.bsie-table th:nth-child(5), table.bsie-table td:nth-child(5) { width: 32%; }
+  table.bsie-table th:nth-child(3), table.bsie-table td:nth-child(3),
+  table.bsie-table th:nth-child(6), table.bsie-table td:nth-child(6) { width: 10%; text-align: right; }
+  table.bsie-table .divider { border-left: 2px solid #333; }
+  table.bsie-table .group-label td { font-weight: bold; }
+  table.bsie-table .subtotal td { font-weight: bold; border-top: 1px solid #999; }
+  table.bsie-table .grand-total td { font-weight: bold; font-size: 13px; color: #b3261e; border-top: 2px solid #333; background: #f7f7f7; }
+
+  /* Ledger / plain report tables: force wrap on the Particulars column so it never overflows */
+  table.report.ledger-table { table-layout: fixed; width: 100%; }
+  table.report.ledger-table th, table.report.ledger-table td { overflow-wrap: break-word; word-break: break-word; white-space: normal; }
+  table.report.ledger-table th:nth-child(1), table.report.ledger-table td:nth-child(1) { width: 12%; }
+  table.report.ledger-table th:nth-child(2), table.report.ledger-table td:nth-child(2) { width: 9%; }
+  table.report.ledger-table th:nth-child(3), table.report.ledger-table td:nth-child(3) { width: 39%; text-align: left; }
+  table.report.ledger-table th:nth-child(4), table.report.ledger-table td:nth-child(4),
+  table.report.ledger-table th:nth-child(5), table.report.ledger-table td:nth-child(5),
+  table.report.ledger-table th:nth-child(6), table.report.ledger-table td:nth-child(6) { width: 13.33%; }
+
+  /* Accounts Report table (8 columns) */
+  table.report.accounts-report-table { table-layout: fixed; width: 100%; }
+  table.report.accounts-report-table th, table.report.accounts-report-table td { overflow-wrap: break-word; word-break: break-word; white-space: normal; }
+  table.report.accounts-report-table th:nth-child(1), table.report.accounts-report-table td:nth-child(1) { width: 8%; }
+  table.report.accounts-report-table th:nth-child(2), table.report.accounts-report-table td:nth-child(2) { width: 8%; }
+  table.report.accounts-report-table th:nth-child(3), table.report.accounts-report-table td:nth-child(3) { width: 26%; text-align: left; }
+  table.report.accounts-report-table th:nth-child(4), table.report.accounts-report-table td:nth-child(4),
+  table.report.accounts-report-table th:nth-child(6), table.report.accounts-report-table td:nth-child(6) { width: 8%; }
+  table.report.accounts-report-table th:nth-child(5), table.report.accounts-report-table td:nth-child(5),
+  table.report.accounts-report-table th:nth-child(7), table.report.accounts-report-table td:nth-child(7),
+  table.report.accounts-report-table th:nth-child(8), table.report.accounts-report-table td:nth-child(8) { width: 14%; }
+
+  /* signatories */
+  .signatories { display: flex; justify-content: space-between; margin-top: 46px; gap: 10px; }
+  .signatories .sig { flex: 1; text-align: center; }
+  .signatories .sig-line { border-top: 1px solid #333; margin: 34px 8px 6px; }
+  .signatories .sig-label { font-weight: bold; font-size: 12px; }
+
+  .report-toolbar { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; }
+  .report-toolbar > div { min-width: 160px; }
+
+  /* mobile stacked tables for reports (screen only) */
+  @media (max-width: 620px) {
+    table.report.stack thead { display: none; }
+    table.report.stack, table.report.stack tbody, table.report.stack tr, table.report.stack td { display: block; width: 100% !important; }
+    table.report.stack tr { border-bottom: 1px solid var(--border); padding: 6px 0; }
+    table.report.stack td { text-align: right; display: flex; justify-content: space-between; padding: 3px 4px; border: none; }
+    table.report.stack td::before { content: attr(data-label); font-weight: bold; text-align: left; color: #555; }
+    .cols { flex-direction: column; }
+    table.bsie-table { font-size: 11px; }
+    table.bsie-table .divider { border-left: none; border-top: 2px solid #333; }
+  }
+
+  /* print */
+  .print-header { display: none; }
+  @media print {
+    header.topbar, #sideNav, #navOverlay, .no-print { display: none !important; }
+    body { background: #fff; font-size: 12px; }
+    main { max-width: none; padding: 0; margin: 0; }
+    .card { border: none; padding: 0; box-shadow: none; }
+    @page { size: A4; margin: 16mm 12mm 14mm; }
+    .print-header {
+      display: flex; justify-content: space-between; position: fixed; top: -11mm; left: 0; right: 0;
+      font-size: 10px; color: #555; border-bottom: 1px solid #999; padding-bottom: 3px;
+    }
+    table.report.stack thead { display: table-header-group; }
+    table.report.stack, table.report.stack tbody, table.report.stack tr, table.report.stack td { display: revert; width: revert; }
+    table.report.stack td { text-align: right; }
+    table.report.stack td:first-child, table.report.stack td:nth-child(2) { text-align: left; }
+    table.report.stack td::before { content: none; }
+    .cols { display: flex; flex-direction: row; }
+
+    /* keep BSIE compact so it fits one A4 page */
+    #bsieReportArea .org-heading-bar { font-size: 14px; padding: 5px; margin-bottom: 6px; }
+    #bsieReportArea .section-title-bar { font-size: 11px; padding: 4px; margin-top: 10px; }
+    #bsieReportArea table.bsie-table th, #bsieReportArea table.bsie-table td { padding: 2px 6px; font-size: 10px; }
+    #bsieReportArea .signatories { margin-top: 26px; }
+    #bsieReportArea .signatories .sig-line { margin: 20px 8px 4px; }
+    #bsieReportArea { page-break-inside: avoid; }
+  }
+
+  #toast {
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: #222; color: #fff;
+    padding: 10px 18px; border-radius: 6px; font-size: 13px; z-index: 500; display: none; max-width: 90%;
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <button id="hamburger" onclick="toggleNav()">&#9776;</button>
+  <div>
+    <h1 id="orgHeaderName">Accounts</h1>
+    <div class="sub">Accounts &amp; Journal</div>
+  </div>
+</header>
+
+<div id="navOverlay" onclick="closeNav()"></div>
+<nav id="sideNav">
+  <div class="navHeader">
+    <div class="name" id="navOrgName">Accounts</div>
+    <div style="font-size:12px;opacity:.85;">Menu</div>
+  </div>
+  <a href="#about" data-route="about">About / Dos &amp; Don'ts</a>
+  <a href="#journal" data-route="journal" data-protected="1">Journal</a>
+  <a href="#batch" data-route="batch" data-protected="1">Batch Transactions</a>
+  <a href="#account" data-route="account" data-protected="1">Account Addition</a>
+  <a href="#bsie" data-route="bsie">BSIE Reports</a>
+  <a href="#ledger" data-route="ledger">Ledger Reports</a>
+  <a href="#accountsReport" data-route="accountsReport">Accounts Report</a>
+  <a href="#close" data-route="close" data-protected="1">Financial Year Closing</a>
+  <a href="#" id="navLockToggle" onclick="toggleDataEntryLock(); return false;"></a>
+</nav>
+
+<div class="print-header" id="printHeader">
+  <span id="printHeaderSub"></span>
+  <span id="printHeaderDate"></span>
+</div>
+
+<main id="app"></main>
+<div id="toast"></div>
+
+<script>
+// ==========================================================================
+// Configure this
+// ==========================================================================
+const WEB_APP_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
+// ==========================================================================
+
+const state = { finYears: [], accounts: [], bsieCodes: [], lastBsie: null, lastLedger: null, lastLedgerAcno: null, lastAccountsReport: null, orgSettings: { orgName: 'Organization', fyStartMonth: 7, signatoryLabels: ['President', 'General Secretary', 'Treasurer', 'Auditor'] } };
+
+// ---------------------------------------------------------------------
+// Nav / routing
+// ---------------------------------------------------------------------
+function toggleNav() {
+  document.getElementById('sideNav').classList.toggle('open');
+  document.getElementById('navOverlay').classList.toggle('open');
+}
+function closeNav() {
+  document.getElementById('sideNav').classList.remove('open');
+  document.getElementById('navOverlay').classList.remove('open');
+}
+
+const ROUTES = {
+  about: renderAbout,
+  journal: renderJournal,
+  batch: renderBatch,
+  account: renderAccount,
+  bsie: renderBsie,
+  ledger: renderLedger,
+  accountsReport: renderAccountsReport,
+  close: renderClose
+};
+
+function parseHash_() {
+  const raw = (location.hash || '#about').slice(1);
+  const qIdx = raw.indexOf('?');
+  if (qIdx === -1) return { route: raw, params: {} };
+  const route = raw.slice(0, qIdx);
+  const params = {};
+  raw.slice(qIdx + 1).split('&').forEach(pair => {
+    if (!pair) return;
+    const eq = pair.indexOf('=');
+    const k = decodeURIComponent(eq === -1 ? pair : pair.slice(0, eq));
+    const v = eq === -1 ? '' : decodeURIComponent(pair.slice(eq + 1));
+    params[k] = v;
+  });
+  return { route: route, params: params };
+}
+
+const PROTECTED_ROUTES = ['journal', 'batch', 'account', 'close'];
+const PASSCODE_KEY = 'entryPasscode';
+
+function getStoredPasscode_() { return localStorage.getItem(PASSCODE_KEY) || ''; }
+function isUnlocked_() { return !!getStoredPasscode_(); }
+
+function renderNavLock_() {
+  const unlocked = isUnlocked_();
+  document.querySelectorAll('#sideNav a[data-protected="1"]').forEach(a => a.classList.toggle('locked-hidden', !unlocked));
+  document.getElementById('navLockToggle').innerText = unlocked ? '🔓 Lock Data Entry' : '🔒 Unlock Data Entry';
+}
+
+function toggleDataEntryLock() {
+  if (isUnlocked_()) {
+    if (!confirm('Lock data entry on this device?')) return;
+    localStorage.removeItem(PASSCODE_KEY);
+    renderNavLock_();
+    closeNav();
+    if (PROTECTED_ROUTES.includes(parseHash_().route)) location.hash = '#about';
+    return;
+  }
+  const pass = prompt('Enter the admin passcode to unlock data entry:');
+  if (!pass) return;
+  apiGet('checkPasscode', { passcode: pass }).then(res => {
+    if (res.valid) {
+      localStorage.setItem(PASSCODE_KEY, pass);
+      renderNavLock_();
+      toast('Data entry unlocked on this device.');
+    } else {
+      toast('Incorrect passcode', true);
+    }
+  }).catch(err => toast(err.message || err, true));
+}
+
+/** Shows a write error; if it was a passcode rejection, also re-locks data entry on this device. */
+function handleWriteError_(err, errorElId) {
+  const msg = err.message || String(err);
+  if (/incorrect passcode/i.test(msg) || /passcode is not configured/i.test(msg)) {
+    localStorage.removeItem(PASSCODE_KEY);
+    renderNavLock_();
+    document.getElementById(errorElId).innerText = 'The saved passcode was rejected — data entry has been re-locked on this device. Please unlock again.';
+  } else {
+    document.getElementById(errorElId).innerText = msg;
+  }
+}
+
+function router() {
+  closeNav();
+  const { route, params } = parseHash_();
+  renderNavLock_();
+
+  if (PROTECTED_ROUTES.includes(route) && !isUnlocked_()) {
+    document.querySelectorAll('#sideNav a').forEach(a => a.classList.toggle('active', a.dataset.route === route));
+    document.getElementById('app').innerHTML =
+      '<div class="card"><h2>Data entry is locked</h2>' +
+      '<p>This section needs the admin passcode. Reports remain open to everyone.</p>' +
+      '<button class="btn" onclick="toggleDataEntryLock()">Unlock Data Entry</button></div>';
+    document.getElementById('printHeaderSub').innerText = '';
+    return;
+  }
+
+  const fn = ROUTES[route] || renderAbout;
+  document.querySelectorAll('#sideNav a').forEach(a => a.classList.toggle('active', a.dataset.route === route));
+  document.getElementById('app').innerHTML = '<div class="card">Loading…</div>';
+  document.getElementById('printHeaderSub').innerText = '';
+  document.getElementById('printHeaderDate').innerText = new Date().toLocaleDateString('en-GB');
+  fn(params);
+}
+window.addEventListener('hashchange', router);
+
+// ---------------------------------------------------------------------
+// API helpers
+// ---------------------------------------------------------------------
+function apiGet(action, params) {
+  let url = WEB_APP_URL + '?action=' + encodeURIComponent(action);
+  if (params) Object.keys(params).forEach(k => { if (params[k] !== undefined) url += '&' + k + '=' + encodeURIComponent(params[k]); });
+  return fetch(url).then(r => r.json()).then(res => {
+    if (!res.ok) throw new Error(res.error);
+    return res.data;
+  });
+}
+function apiPost(body) {
+  return fetch(WEB_APP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body)
+  }).then(r => r.json()).then(res => {
+    if (!res.ok) throw new Error(res.error);
+    return res.data;
+  });
+}
+function toast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.innerText = msg;
+  t.style.background = isError ? '#c0392b' : '#222';
+  t.style.display = 'block';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.style.display = 'none', 4000);
+}
+function fmt(n) {
+  n = Number(n) || 0;
+  return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function isoToDdMmYyyy_(iso) {
+  const parts = String(iso).split('-');
+  return parts.length === 3 ? (parts[2] + '/' + parts[1] + '/' + parts[0]) : iso;
+}
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function getFinYears() {
+  return state.finYears.length ? Promise.resolve(state.finYears) : apiGet('finYears').then(d => { state.finYears = d.finYears; return d.finYears; });
+}
+
+// ---------------------------------------------------------------------
+// Autocomplete (as-you-type account filter)
+// ---------------------------------------------------------------------
+function setupAutocomplete(inputId, listId, hiddenId, items) {
+  const input = document.getElementById(inputId);
+  const list = document.getElementById(listId);
+  const hidden = document.getElementById(hiddenId);
+
+  function render(filter) {
+    const f = filter.trim().toLowerCase();
+    const matches = f ? items.filter(a => a.toLowerCase().includes(f)) : items;
+    if (!matches.length) { list.style.display = 'none'; return; }
+    list.innerHTML = matches.slice(0, 50).map(a => '<div data-v="' + escapeHtml(a) + '">' + escapeHtml(a) + '</div>').join('');
+    list.style.display = 'block';
+  }
+
+  input.addEventListener('input', () => { hidden.value = ''; input.style.borderColor = '#ccc'; render(input.value); });
+  input.addEventListener('focus', () => render(input.value));
+  input.addEventListener('blur', () => {
+    setTimeout(() => {
+      list.style.display = 'none';
+      if (items.includes(input.value)) { hidden.value = input.value; input.style.borderColor = '#ccc'; }
+      else if (input.value) { input.style.borderColor = '#c0392b'; hidden.value = ''; }
+    }, 150);
+  });
+  list.addEventListener('mousedown', e => {
+    const v = e.target.getAttribute('data-v');
+    if (v == null) return;
+    input.value = v; hidden.value = v; list.style.display = 'none'; input.style.borderColor = '#ccc';
+  });
+}
+
+// ---------------------------------------------------------------------
+// About
+// ---------------------------------------------------------------------
+function renderAbout() {
+  const orgName = state.orgSettings.orgName;
+  document.getElementById('app').innerHTML =
+    '<div class="card">' +
+    '<h2>About</h2>' +
+    '<p>This app is the Journal &amp; Accounts data entry and reporting system for ' +
+    '<strong>' + escapeHtml(orgName) + '</strong>. Entries made here write directly to the ' +
+    'organization\'s Google Sheet.</p>' +
+    '<p class="hint">Reports (BSIE, Ledger, Accounts Report) are open to everyone with this link. ' +
+    'Journal, Batch Transactions, Account Addition, and Financial Year Closing require the admin ' +
+    'passcode — use "Unlock Data Entry" at the bottom of the menu if you\'re an administrator.</p>' +
+    '<h3>Dos</h3>' +
+    '<ul>' +
+    '<li>Double-check the Debit and Credit accounts before submitting a Journal entry — there is no in-app edit.</li>' +
+    '<li>Use the account search box (type to filter) to avoid picking the wrong account.</li>' +
+    '<li>Check the BSIE report\'s balance badge after major entries — it flags miscoded accounts.</li>' +
+    '<li>Only run Financial Year Closing once, after the year\'s entries are complete and reviewed.</li>' +
+    '</ul>' +
+    '<h3>Don\'ts</h3>' +
+    '<ul>' +
+    '<li>Don\'t worry about a duplicate Journal Number — it can happen if two people enter around the same time. ' +
+    'It doesn\'t affect totals; an administrator can correct it directly in the Sheet later.</li>' +
+    '<li>Don\'t re-run Financial Year Closing for a year that\'s already been closed — it will refuse if the next year already has entries.</li>' +
+    '<li>Don\'t delete or edit entries here — that\'s done directly in the Google Sheet by an administrator.</li>' +
+    '<li>For a transaction that isn\'t a simple 1-debit/1-credit case (e.g. several expense claims paid out via a couple of ' +
+    'cheques that don\'t match 1:1), use <strong>Batch Transactions</strong> instead of Journal — it lets you add several ' +
+    'debit and credit lines and only requires the totals to balance.</li>' +
+    '</ul>' +
+    '<p class="hint" style="text-align:center;margin-top:30px;">Built by Claude and GVSS</p>' +
+    '</div>';
+}
+
+// ---------------------------------------------------------------------
+// Journal
+// ---------------------------------------------------------------------
+function renderJournal() {
+  apiGet('journalForm').then(data => {
+    state.accounts = data.accounts;
+    document.getElementById('app').innerHTML =
+      '<div class="card">' +
+      '<h2>New Journal Entry</h2>' +
+      '<div class="row">' +
+        '<div><label>Financial Year</label><input id="j_finYear" readonly value="' + data.finYear + '">' +
+          '<div class="hint">' + isoToDdMmYyyy_(data.finYearStart) + ' to ' + isoToDdMmYyyy_(data.finYearEnd) + '</div></div>' +
+        '<div><label>Journal No.</label><input id="j_jrnlNo" readonly value="' + data.nextJrnlNo + '"></div>' +
+      '</div>' +
+      '<label>Date</label><input type="date" id="j_date" min="' + data.finYearStart + '" max="' + data.finYearEnd + '">' +
+      '<div class="row">' +
+        '<div class="ac-wrap"><label>Debit Account</label><input id="j_drInput" placeholder="Type to search…" autocomplete="off">' +
+          '<div class="ac-list" id="j_drList"></div><input type="hidden" id="j_drAccount"></div>' +
+        '<div class="ac-wrap"><label>Credit Account</label><input id="j_crInput" placeholder="Type to search…" autocomplete="off">' +
+          '<div class="ac-list" id="j_crList"></div><input type="hidden" id="j_crAccount"></div>' +
+      '</div>' +
+      '<label>Details of Transaction</label><textarea id="j_details" rows="2"></textarea>' +
+      '<label>Amount</label><input type="number" id="j_amount" min="0" step="0.01">' +
+      '<div><button class="btn" id="j_submit" onclick="submitJournal()">Add Journal Entry</button></div>' +
+      '<div id="j_error" class="msg-error"></div><div id="j_ok" class="msg-ok"></div>' +
+      '</div>';
+    setupAutocomplete('j_drInput', 'j_drList', 'j_drAccount', data.accounts);
+    setupAutocomplete('j_crInput', 'j_crList', 'j_crAccount', data.accounts);
+  }).catch(err => showError('app', err));
+}
+
+function submitJournal() {
+  document.getElementById('j_error').innerText = '';
+  document.getElementById('j_ok').innerText = '';
+  const btn = document.getElementById('j_submit');
+  const entry = {
+    date: document.getElementById('j_date').value,
+    finYear: document.getElementById('j_finYear').value,
+    drAccount: document.getElementById('j_drAccount').value,
+    crAccount: document.getElementById('j_crAccount').value,
+    details: document.getElementById('j_details').value,
+    amount: document.getElementById('j_amount').value
+  };
+  if (!entry.date) { document.getElementById('j_error').innerText = 'Please select a date'; return; }
+  if (!entry.drAccount) { document.getElementById('j_error').innerText = 'Please pick a valid Debit account from the list'; return; }
+  if (!entry.crAccount) { document.getElementById('j_error').innerText = 'Please pick a valid Credit account from the list'; return; }
+
+  btn.disabled = true;
+  apiPost({ action: 'journal', entry: entry, passcode: getStoredPasscode_() })
+    .then(res => {
+      document.getElementById('j_ok').innerText = 'Saved as Journal No. ' + res.jrnlNo;
+      document.getElementById('j_details').value = '';
+      document.getElementById('j_amount').value = '';
+      btn.disabled = false;
+      renderJournal();
+    })
+    .catch(err => { handleWriteError_(err, 'j_error'); btn.disabled = false; });
+}
+
+// ---------------------------------------------------------------------
+// Batch Transactions
+// ---------------------------------------------------------------------
+const batchState = { finYear: '', jrnlNo: '', finYearStart: '', finYearEnd: '', accounts: [], lines: [] };
+
+function renderBatch() {
+  apiGet('journalForm').then(data => {
+    batchState.finYear = data.finYear;
+    batchState.jrnlNo = data.nextJrnlNo;
+    batchState.finYearStart = data.finYearStart;
+    batchState.finYearEnd = data.finYearEnd;
+    batchState.accounts = data.accounts;
+    batchState.lines = [];
+
+    document.getElementById('app').innerHTML =
+      '<div class="card">' +
+      '<h2>Batch Transactions</h2>' +
+      '<p class="hint">For a voucher with several debit and/or credit lines — e.g. a few expense claims paid out via a ' +
+      'couple of cheques that don\'t match 1:1. Only the totals need to balance.</p>' +
+      '<div class="row">' +
+        '<div><label>Financial Year</label><input id="bt_finYear" readonly value="' + batchState.finYear + '">' +
+          '<div class="hint">' + isoToDdMmYyyy_(batchState.finYearStart) + ' to ' + isoToDdMmYyyy_(batchState.finYearEnd) + '</div></div>' +
+        '<div><label>Journal No. (voucher)</label><input id="bt_jrnlNo" readonly value="' + batchState.jrnlNo + '"></div>' +
+        '<div><label>Date (applies to whole batch)</label><input type="date" id="bt_date" min="' + batchState.finYearStart + '" max="' + batchState.finYearEnd + '"></div>' +
+      '</div>' +
+      '<h3>Add a line</h3>' +
+      '<div class="row">' +
+        '<div class="ac-wrap"><label>Account</label><input id="bt_acctInput" placeholder="Type to search…" autocomplete="off">' +
+          '<div class="ac-list" id="bt_acctList"></div><input type="hidden" id="bt_acct"></div>' +
+        '<div><label>Dr / Cr</label><select id="bt_drCr"><option value="Dr">Dr</option><option value="Cr">Cr</option></select></div>' +
+        '<div><label>Amount</label><input type="number" id="bt_amount" min="0" step="0.01"></div>' +
+      '</div>' +
+      '<label>Details of Transaction</label><input id="bt_details">' +
+      '<div><button class="btn secondary" onclick="addBatchLine()">Add to Batch</button></div>' +
+      '<div id="bt_lineError" class="msg-error"></div>' +
+
+      '<h3>Pending lines</h3>' +
+      '<div id="bt_table"></div>' +
+      '<div id="bt_tally" style="margin-top:10px;font-weight:bold;"></div>' +
+      '<div><button class="btn" id="bt_post" onclick="postBatch()" disabled>Post Batch</button></div>' +
+      '<div id="bt_error" class="msg-error"></div><div id="bt_ok" class="msg-ok"></div>' +
+      '</div>';
+
+    setupAutocomplete('bt_acctInput', 'bt_acctList', 'bt_acct', batchState.accounts);
+    renderBatchTable();
+  }).catch(err => showError('app', err));
+}
+
+function addBatchLine() {
+  document.getElementById('bt_lineError').innerText = '';
+  const account = document.getElementById('bt_acct').value;
+  const drCr = document.getElementById('bt_drCr').value;
+  const amount = Number(document.getElementById('bt_amount').value);
+  const details = document.getElementById('bt_details').value;
+
+  if (!account) { document.getElementById('bt_lineError').innerText = 'Please pick a valid account from the list'; return; }
+  if (!amount || amount <= 0) { document.getElementById('bt_lineError').innerText = 'Enter a positive amount'; return; }
+
+  batchState.lines.push({ account, drCr, amount, details });
+
+  document.getElementById('bt_acctInput').value = '';
+  document.getElementById('bt_acct').value = '';
+  document.getElementById('bt_amount').value = '';
+  document.getElementById('bt_details').value = '';
+  renderBatchTable();
+}
+
+function removeBatchLine(idx) {
+  batchState.lines.splice(idx, 1);
+  renderBatchTable();
+}
+
+function renderBatchTable() {
+  const lines = batchState.lines;
+  const table = document.getElementById('bt_table');
+  if (!lines.length) {
+    table.innerHTML = '<p class="hint">No lines added yet.</p>';
+  } else {
+    table.innerHTML =
+      '<div class="table-wrap"><table class="report stack"><thead><tr>' +
+      '<th>Account</th><th>Dr/Cr</th><th>Details</th><th>Amount</th><th></th>' +
+      '</tr></thead><tbody>' +
+      lines.map((l, i) =>
+        '<tr>' +
+        '<td data-label="Account">' + escapeHtml(l.account) + '</td>' +
+        '<td data-label="Dr/Cr">' + l.drCr + '</td>' +
+        '<td data-label="Details">' + escapeHtml(l.details) + '</td>' +
+        '<td data-label="Amount">' + fmt(l.amount) + '</td>' +
+        '<td data-label=""><button class="btn secondary" style="margin:0;padding:3px 9px;" onclick="removeBatchLine(' + i + ')">✕</button></td>' +
+        '</tr>'
+      ).join('') +
+      '</tbody></table></div>';
+  }
+
+  const totalDr = lines.filter(l => l.drCr === 'Dr').reduce((s, l) => s + l.amount, 0);
+  const totalCr = lines.filter(l => l.drCr === 'Cr').reduce((s, l) => s + l.amount, 0);
+  const drCount = lines.filter(l => l.drCr === 'Dr').length;
+  const crCount = lines.filter(l => l.drCr === 'Cr').length;
+  const balanced = drCount > 0 && crCount > 0 && Math.round(totalDr * 100) === Math.round(totalCr * 100);
+
+  const tally = document.getElementById('bt_tally');
+  tally.innerHTML = 'Total Dr: ' + fmt(totalDr) + ' &nbsp; Total Cr: ' + fmt(totalCr) + ' &nbsp; ' +
+    (balanced
+      ? '<span class="badge ok">Balanced ✓</span>'
+      : '<span class="badge bad">Difference: ' + fmt(Math.abs(totalDr - totalCr)) + '</span>');
+
+  document.getElementById('bt_post').disabled = !balanced;
+}
+
+function postBatch() {
+  document.getElementById('bt_error').innerText = '';
+  document.getElementById('bt_ok').innerText = '';
+  const date = document.getElementById('bt_date').value;
+  if (!date) { document.getElementById('bt_error').innerText = 'Please select a date'; return; }
+
+  const btn = document.getElementById('bt_post');
+  btn.disabled = true;
+
+  const entry = {
+    date: date,
+    finYear: batchState.finYear,
+    lines: batchState.lines.map(l => ({ account: l.account, drCr: l.drCr, details: l.details, amount: l.amount }))
+  };
+
+  apiPost({ action: 'batchJournal', entry: entry, passcode: getStoredPasscode_() })
+    .then(res => {
+      document.getElementById('bt_ok').innerText = 'Posted as Journal No. ' + res.jrnlNo + ' (' + res.linesCreated + ' lines).';
+      renderBatch();
+    })
+    .catch(err => { handleWriteError_(err, 'bt_error'); btn.disabled = false; });
+}
+
+// ---------------------------------------------------------------------
+// Account Addition
+// ---------------------------------------------------------------------
+function renderAccount() {
+  apiGet('accountsForm').then(data => {
+    state.bsieCodes = data.bsieCodes;
+    const byType = {};
+    data.bsieCodes.forEach(c => { (byType[c.type] = byType[c.type] || []).push(c); });
+    const options = Object.keys(byType).map(t =>
+      '<optgroup label="' + escapeHtml(t) + '">' +
+      byType[t].map(c => '<option value="' + c.mapping + '">' + c.mapping + ' — ' + escapeHtml(c.label) + '</option>').join('') +
+      '</optgroup>'
+    ).join('');
+
+    document.getElementById('app').innerHTML =
+      '<div class="card">' +
+      '<h2>New Account</h2>' +
+      '<label>BSIE Mapping</label>' +
+      '<select id="a_bsie" onchange="onBsieChange()"><option value="">Select…</option>' + options + '</select>' +
+      '<div class="row">' +
+        '<div><label>Account No.</label><input id="a_acno" maxlength="4" oninput="updateAcctPreview()">' +
+          '<div class="hint">4 digits — auto-suggested, editable</div></div>' +
+      '</div>' +
+      '<label>Account Name</label><input id="a_acname" oninput="updateAcctPreview()">' +
+      '<div class="hint" style="margin-top:16px;padding:9px;background:#f3f3f3;border-radius:5px;" id="a_preview">Full account name will appear here</div>' +
+      '<div><button class="btn" id="a_submit" onclick="submitAccount()">Add Account</button></div>' +
+      '<div id="a_error" class="msg-error"></div><div id="a_ok" class="msg-ok"></div>' +
+      '</div>';
+  }).catch(err => showError('app', err));
+}
+function onBsieChange() {
+  const code = document.getElementById('a_bsie').value;
+  if (!code) return;
+  const info = state.bsieCodes.find(c => c.mapping === code);
+  apiGet('nextAcno', { type: info.typeKey }).then(d => {
+    document.getElementById('a_acno').value = d.acno;
+    updateAcctPreview();
+  }).catch(err => document.getElementById('a_error').innerText = err.message || err);
+}
+function updateAcctPreview() {
+  const acno = document.getElementById('a_acno').value.trim();
+  const name = document.getElementById('a_acname').value.trim();
+  document.getElementById('a_preview').innerText = (acno && name) ? (acno + '-' + name) : 'Full account name will appear here';
+}
+function submitAccount() {
+  document.getElementById('a_error').innerText = '';
+  document.getElementById('a_ok').innerText = '';
+  const btn = document.getElementById('a_submit');
+  const entry = {
+    bsie: document.getElementById('a_bsie').value,
+    acno: document.getElementById('a_acno').value.trim(),
+    acname: document.getElementById('a_acname').value.trim()
+  };
+  btn.disabled = true;
+  apiPost({ action: 'account', entry: entry, passcode: getStoredPasscode_() })
+    .then(res => {
+      document.getElementById('a_ok').innerText = 'Saved: ' + res.fullacname;
+      document.getElementById('a_acname').value = '';
+      document.getElementById('a_preview').innerText = 'Full account name will appear here';
+      btn.disabled = false;
+    })
+    .catch(err => { handleWriteError_(err, 'a_error'); btn.disabled = false; });
+}
+
+// ---------------------------------------------------------------------
+// BSIE Reports
+// ---------------------------------------------------------------------
+function renderBsie(params) {
+  getFinYears().then(fys => {
+    document.getElementById('app').innerHTML =
+      '<div class="card no-print">' +
+      '<h2>Balance Sheet &amp; Income / Expenditure</h2>' +
+      '<div class="report-toolbar">' +
+        '<div><label>Financial Year</label><select id="b_fy" onchange="loadBsie()">' +
+          fys.map(fy => '<option value="' + fy + '">' + fy + '</option>').join('') + '</select></div>' +
+        '<div><button class="btn secondary" onclick="savePdf(\'bsie\',\'BSIE\')">Save PDF (A4)</button></div>' +
+        (canShareFiles_() ? '<div><button class="btn secondary" onclick="shareWhatsAppPdf(\'bsie\',\'BSIE\')">Share via WhatsApp</button></div>' : '') +
+      '</div></div>' +
+      '<div id="bsieReportArea"></div>';
+    const fy = (params && params.fy && fys.includes(params.fy)) ? params.fy : (fys[fys.length - 1] || '');
+    document.getElementById('b_fy').value = fy;
+    loadBsie();
+  }).catch(err => showError('app', err));
+}
+function loadBsie() {
+  const fy = document.getElementById('b_fy').value;
+  document.getElementById('printHeaderSub').innerText = fy + ' BS-IE';
+  apiGet('bsie', { finYear: fy }).then(d => { state.lastBsie = d; renderBsieData(d); }).catch(err => showError('bsieReportArea', err));
+}
+
+/** Flattens BSIE groups into rows: {ac, label, amount, cls} for the side-by-side statement table. */
+function flattenBsieGroups_(groups) {
+  const rows = [];
+  groups.forEach(g => {
+    if (g.lines.length <= 1) {
+      rows.push({ ac: g.mapping, label: g.label, amount: g.subtotal, cls: '' });
+    } else {
+      rows.push({ ac: g.mapping, label: g.label, amount: '', cls: 'group-label' });
+      g.lines.forEach(l => rows.push({ ac: '', label: '\u2003' + l.acno + '-' + l.acname, amount: l.balance, cls: '' }));
+      rows.push({ ac: '', label: g.label + ' subtotal', amount: g.subtotal, cls: 'subtotal' });
+    }
+  });
+  return rows;
+}
+/** One <table> with both sides so their Total rows land on the exact same <tr>. */
+function sideBySideTable_(leftHead, leftGroups, leftTotalLabel, leftTotal, rightHead, rightGroups, rightTotalLabel, rightTotal) {
+  const L = flattenBsieGroups_(leftGroups), R = flattenBsieGroups_(rightGroups);
+  const n = Math.max(L.length, R.length);
+  let body = '';
+  for (let i = 0; i < n; i++) {
+    const l = L[i] || { ac: '', label: '', amount: '', cls: '' };
+    const r = R[i] || { ac: '', label: '', amount: '', cls: '' };
+    body += '<tr>' +
+      '<td class="ac-col ' + l.cls + '" data-label="AC">' + escapeHtml(l.ac) + '</td>' +
+      '<td class="' + l.cls + '" data-label="Item">' + escapeHtml(l.label) + '</td>' +
+      '<td class="' + l.cls + '" data-label="Amount">' + (l.amount === '' ? '' : fmt(l.amount)) + '</td>' +
+      '<td class="ac-col divider ' + r.cls + '" data-label="AC">' + escapeHtml(r.ac) + '</td>' +
+      '<td class="' + r.cls + '" data-label="Item">' + escapeHtml(r.label) + '</td>' +
+      '<td class="' + r.cls + '" data-label="Amount">' + (r.amount === '' ? '' : fmt(r.amount)) + '</td>' +
+      '</tr>';
+  }
+  body += '<tr class="grand-total">' +
+    '<td colspan="2" data-label="Total">' + escapeHtml(leftTotalLabel) + '</td><td data-label="Amount">' + fmt(leftTotal) + '</td>' +
+    '<td colspan="2" class="divider" data-label="Total">' + escapeHtml(rightTotalLabel) + '</td><td data-label="Amount">' + fmt(rightTotal) + '</td>' +
+    '</tr>';
+  return '<div class="table-wrap"><table class="report stack bsie-table"><thead><tr>' +
+    '<th class="ac-col">AC</th><th>' + escapeHtml(leftHead) + '</th><th>Amount</th>' +
+    '<th class="ac-col divider">AC</th><th>' + escapeHtml(rightHead) + '</th><th>Amount</th>' +
+    '</tr></thead><tbody>' + body + '</tbody></table></div>';
+}
+function signatoriesBlock_() {
+  return '<div class="signatories">' +
+    state.orgSettings.signatoryLabels.map(role =>
+      '<div class="sig"><div class="sig-line"></div><div class="sig-label">' + escapeHtml(role) + '</div></div>'
+    ).join('') + '</div>';
+}
+function renderBsieData(d) {
+  const badge = d.balanced
+    ? '<span class="badge ok">Assets = Liabilities</span>'
+    : '<span class="badge bad">Out of balance by ' + fmt(Math.abs(d.totalAssets - d.totalLiabilities)) + '</span>';
+
+  const html =
+    '<div class="card" id="bsieCard">' +
+    '<div class="org-heading-bar">' + escapeHtml(d.orgName) + '</div>' +
+    '<div class="no-print" style="text-align:center;margin-bottom:10px;">' + badge + '</div>' +
+    '<div class="section-title-bar">ASSETS AND LIABILITIES AS ON ' + d.asOnDate + '</div>' +
+    sideBySideTable_('Liabilities', d.liabilities, 'Total', d.totalLiabilities, 'Assets', d.assets, 'Total', d.totalAssets) +
+    '<div class="section-title-bar">INCOME AND EXPENDITURE AS ON ' + d.asOnDate + '</div>' +
+    sideBySideTable_('Expenditure', d.expenditure, 'Total', d.totalExpenditure, 'Income', d.income, 'Total', d.totalIncome) +
+    signatoriesBlock_() +
+    '</div>';
+  document.getElementById('bsieReportArea').innerHTML = html;
+}
+
+// ---------------------------------------------------------------------
+// Ledger Reports
+// ---------------------------------------------------------------------
+function renderLedger(params) {
+  Promise.all([getFinYears(), apiGet('journalForm')]).then(([fys, jf]) => {
+    document.getElementById('app').innerHTML =
+      '<div class="card no-print">' +
+      '<h2>Ledger</h2>' +
+      '<div class="report-toolbar">' +
+        '<div><label>Financial Year</label><select id="l_fy" onchange="loadLedger()">' +
+          fys.map(fy => '<option value="' + fy + '">' + fy + '</option>').join('') + '</select></div>' +
+        '<div><label>Account</label><select id="l_acc" onchange="loadLedger()"><option value="ALL">All Accounts</option>' +
+          jf.accounts.map(a => '<option value="' + escapeHtml(a) + '">' + escapeHtml(a) + '</option>').join('') + '</select></div>' +
+        '<div><button class="btn secondary" onclick="savePdf(\'ledger\',\'Ledger\')">Save PDF (A4)</button></div>' +
+        (canShareFiles_() ? '<div><button class="btn secondary" onclick="shareWhatsAppPdf(\'ledger\',\'Ledger\')">Share via WhatsApp</button></div>' : '') +
+      '</div></div>' +
+      '<div id="ledgerReportArea"></div>';
+    const fy = (params && params.fy && fys.includes(params.fy)) ? params.fy : (fys[fys.length - 1] || '');
+    document.getElementById('l_fy').value = fy;
+    if (params && params.acno && jf.accounts.includes(params.acno)) document.getElementById('l_acc').value = params.acno;
+    loadLedger();
+  }).catch(err => showError('app', err));
+}
+function loadLedger() {
+  const fy = document.getElementById('l_fy').value;
+  const acc = document.getElementById('l_acc').value;
+  document.getElementById('printHeaderSub').innerText = fy + ' LEDGER';
+  state.lastLedgerAcno = acc;
+  apiGet('ledger', { finYear: fy, acno: acc }).then(d => { state.lastLedger = d; renderLedgerData(d); }).catch(err => showError('ledgerReportArea', err));
+}
+function batchSummaryTable_(batchLines) {
+  const rows = batchLines.map(l =>
+    '<tr>' +
+    '<td data-label="Date">' + l.date + '</td>' +
+    '<td data-label="Jrnl No">' + l.jrnlNo + '</td>' +
+    '<td data-label="Particulars">' + escapeHtml(l.particulars) + '</td>' +
+    '<td data-label="Dr/Cr">' + l.drCr + '</td>' +
+    '<td data-label="Amount">' + fmt(l.amount) + '</td>' +
+    '</tr>'
+  ).join('');
+  return '<div class="card" style="margin-top:20px;">' +
+    '<div class="report-subheading">BATCH TRANSACTIONS SUMMARY</div>' +
+    '<div class="table-wrap"><table class="report stack ledger-table"><thead><tr>' +
+    '<th>Date</th><th>Jrnl No</th><th>Particulars</th><th>Dr/Cr</th><th>Amount</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+}
+function renderLedgerData(d) {
+  // Heading appears once, at the very top of normal document flow — so when printed
+  // it naturally shows on page 1 only; it is not part of the repeating fixed header.
+  const heading =
+    '<div class="org-heading-bar">' + escapeHtml(d.orgName) + '</div>' +
+    '<div class="report-subheading">LEDGER AS ON ' + d.asOnDate + '</div>';
+
+  const showBatchSummary = state.lastLedgerAcno === 'ALL' && d.batchLines && d.batchLines.length > 0;
+
+  if (!d.accounts.length) {
+    document.getElementById('ledgerReportArea').innerHTML = '<div class="card">' + heading + '<p>No entries for this selection.</p></div>' +
+      (showBatchSummary ? batchSummaryTable_(d.batchLines) : '');
+    return;
+  }
+  const body = d.accounts.map(acc => {
+    const rows = acc.entries.map(e =>
+      '<tr>' +
+      '<td data-label="Date">' + e.date + '</td>' +
+      '<td data-label="Jrnl No">' + e.jrnlNo + '</td>' +
+      '<td data-label="Particulars">' + escapeHtml(e.particulars) + (e.details ? ' — ' + escapeHtml(e.details) : '') + '</td>' +
+      '<td data-label="Debit">' + (e.debit ? fmt(e.debit) : '') + '</td>' +
+      '<td data-label="Credit">' + (e.credit ? fmt(e.credit) : '') + '</td>' +
+      '<td data-label="Balance">' + fmt(e.balance) + '</td>' +
+      '</tr>'
+    ).join('');
+    return '<div class="account-block">' +
+      '<div class="account-header"><span>' + escapeHtml(acc.fullacname) + '</span><span>Closing: ' + fmt(acc.closingBalance) + '</span></div>' +
+      '<div class="table-wrap"><table class="report stack ledger-table"><thead><tr><th>Date</th><th>Jrnl No</th><th>Particulars</th>' +
+      '<th>Debit</th><th>Credit</th><th>Balance</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+  }).join('');
+  document.getElementById('ledgerReportArea').innerHTML = '<div class="card">' + heading + body + signatoriesBlock_() + '</div>' +
+    (showBatchSummary ? batchSummaryTable_(d.batchLines) : '');
+}
+
+// ---------------------------------------------------------------------
+// Accounts Report
+// ---------------------------------------------------------------------
+function renderAccountsReport(params) {
+  getFinYears().then(fys => {
+    document.getElementById('app').innerHTML =
+      '<div class="card no-print">' +
+      '<h2>Accounts Report</h2>' +
+      '<div class="report-toolbar">' +
+        '<div><label>Financial Year</label><select id="ar_fy" onchange="loadAccountsReport()">' +
+          fys.map(fy => '<option value="' + fy + '">' + fy + '</option>').join('') + '</select></div>' +
+        '<div><button class="btn secondary" onclick="savePdf(\'accountsReport\',\'AccountsReport\')">Save PDF (A4)</button></div>' +
+        (canShareFiles_() ? '<div><button class="btn secondary" onclick="shareWhatsAppPdf(\'accountsReport\',\'AccountsReport\')">Share via WhatsApp</button></div>' : '') +
+      '</div></div>' +
+      '<div id="accountsReportArea"></div>';
+    const fy = (params && params.fy && fys.includes(params.fy)) ? params.fy : (fys[fys.length - 1] || '');
+    document.getElementById('ar_fy').value = fy;
+    loadAccountsReport();
+  }).catch(err => showError('app', err));
+}
+function loadAccountsReport() {
+  const fy = document.getElementById('ar_fy').value;
+  document.getElementById('printHeaderSub').innerText = fy + ' ACCOUNTS';
+  apiGet('accountsReport', { finYear: fy }).then(d => { state.lastAccountsReport = d; renderAccountsReportData(d); }).catch(err => showError('accountsReportArea', err));
+}
+function renderAccountsReportData(d) {
+  const rows = d.accounts.map(a =>
+    '<tr>' +
+    '<td data-label="AC">' + escapeHtml(a.acno) + '</td>' +
+    '<td data-label="BSIE">' + escapeHtml(a.bsie) + '</td>' +
+    '<td data-label="Name">' + escapeHtml(a.acname) + '</td>' +
+    '<td data-label="Dr Count">' + a.debitCount + '</td>' +
+    '<td data-label="Total Debits">' + fmt(a.totalDebits) + '</td>' +
+    '<td data-label="Cr Count">' + a.creditCount + '</td>' +
+    '<td data-label="Total Credits">' + fmt(a.totalCredits) + '</td>' +
+    '<td data-label="Balance">' + fmt(a.balance) + '</td>' +
+    '</tr>'
+  ).join('');
+  document.getElementById('accountsReportArea').innerHTML =
+    '<div class="card">' +
+    '<div class="org-heading-bar">' + escapeHtml(d.orgName) + '</div>' +
+    '<div class="report-subheading">ACCOUNTS REPORT — FY ' + escapeHtml(d.finYear) + '</div>' +
+    '<div class="table-wrap"><table class="report stack accounts-report-table"><thead><tr>' +
+    '<th>AC</th><th>BSIE</th><th>Name</th><th>Dr Count</th><th>Total Debits</th><th>Cr Count</th><th>Total Credits</th><th>Balance</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    '</div>';
+}
+
+// ---------------------------------------------------------------------
+// Financial Year Closing
+// ---------------------------------------------------------------------
+function renderClose() {
+  getFinYears().then(fys => {
+    document.getElementById('app').innerHTML =
+      '<div class="card">' +
+      '<h2>Financial Year Closing</h2>' +
+      '<p class="hint">Posts opening-balance entries for the next FY from this FY\'s closing Asset/Liability balances. Requires the admin passcode.</p>' +
+      '<label>Financial Year to Close</label>' +
+      '<select id="c_fy" onchange="previewClose()">' + fys.map(fy => '<option value="' + fy + '">' + fy + '</option>').join('') + '</select>' +
+      '<div id="c_preview"></div>' +
+      '<label>Admin Passcode</label><input type="password" id="c_pass">' +
+      '<div><button class="btn" id="c_confirm" onclick="confirmClose()" disabled>Approve &amp; Close Year</button></div>' +
+      '<div id="c_error" class="msg-error"></div><div id="c_ok" class="msg-ok"></div>' +
+      '</div>';
+    document.getElementById('c_fy').value = fys[fys.length - 1] || '';
+    previewClose();
+  }).catch(err => showError('app', err));
+}
+function previewClose() {
+  const fy = document.getElementById('c_fy').value;
+  document.getElementById('c_preview').innerHTML = '<p class="hint">Loading preview…</p>';
+  document.getElementById('c_confirm').disabled = true;
+  apiGet('closeYearPreview', { finYear: fy }).then(p => {
+    if (p.newFinYearAlreadyHasEntries) {
+      document.getElementById('c_preview').innerHTML =
+        '<div class="msg-error">FY ' + p.newFinYear + ' already has journal entries — this year appears to be closed already.</div>';
+      return;
+    }
+    if (!p.lines.length) {
+      document.getElementById('c_preview').innerHTML = '<div class="msg-error">No non-zero Asset/Liability balances found for ' + fy + '.</div>';
+      return;
+    }
+    const totalDr = p.lines.filter(l => l.drCr === 'Dr').reduce((s, l) => s + l.amount, 0);
+    const totalCr = p.lines.filter(l => l.drCr === 'Cr').reduce((s, l) => s + l.amount, 0);
+    const rows = p.lines.map(l =>
+      '<tr><td data-label="Account">' + escapeHtml(l.account) + '</td><td data-label="Dr/Cr">' + l.drCr + '</td><td data-label="Amount">' + fmt(l.amount) + '</td></tr>'
+    ).join('');
+    document.getElementById('c_preview').innerHTML =
+      '<h3>Preview: one voucher to post into FY ' + p.newFinYear + '</h3>' +
+      '<div class="table-wrap"><table class="report stack"><thead><tr><th>Account</th><th>Dr/Cr</th><th>Amount</th></tr></thead><tbody>' + rows +
+      '<tr class="grand-total"><td data-label="Total">Total</td><td></td><td data-label="Amount">Dr ' + fmt(totalDr) + ' / Cr ' + fmt(totalCr) + '</td></tr>' +
+      '</tbody></table></div>' +
+      '<p class="hint">' + p.lines.length + ' lines, one voucher, will be posted, dated 1 July of FY ' + p.newFinYear + '. The B/f account (' + escapeHtml(p.bfAccount) + ') takes whichever side balances the voucher.</p>';
+    document.getElementById('c_confirm').disabled = false;
+  }).catch(err => { document.getElementById('c_preview').innerHTML = ''; document.getElementById('c_error').innerText = err.message || err; });
+}
+function confirmClose() {
+  const fy = document.getElementById('c_fy').value;
+  const pass = document.getElementById('c_pass').value;
+  document.getElementById('c_error').innerText = '';
+  document.getElementById('c_ok').innerText = '';
+  if (!pass) { document.getElementById('c_error').innerText = 'Enter the admin passcode'; return; }
+  if (!confirm('This will post opening-balance entries into the next financial year. Continue?')) return;
+  document.getElementById('c_confirm').disabled = true;
+  apiPost({ action: 'closeYear', finYear: fy, passcode: pass })
+    .then(res => {
+      document.getElementById('c_ok').innerText = 'Closed. Posted ' + res.entriesCreated + ' lines as Journal No. ' + res.jrnlNo + ' into FY ' + res.newFinYear + '.';
+      state.finYears = [];
+      document.getElementById('c_pass').value = '';
+    })
+    .catch(err => { document.getElementById('c_error').innerText = err.message || err; document.getElementById('c_confirm').disabled = false; });
+}
+
+// ---------------------------------------------------------------------
+// PDF generation (vector, via jspdf-autotable — draws real tables/text,
+// no DOM screenshotting, so nothing can overflow/clip like html2canvas did)
+// ---------------------------------------------------------------------
+function canShareFiles_() {
+  try {
+    return !!(navigator.canShare && navigator.share &&
+      navigator.canShare({ files: [new File(['x'], 't.pdf', { type: 'application/pdf' })] }));
+  } catch (e) { return false; }
+}
+function currentFinYear_(view) {
+  if (view === 'bsie') return document.getElementById('b_fy').value;
+  if (view === 'accountsReport') return document.getElementById('ar_fy').value;
+  return document.getElementById('l_fy').value;
+}
+function orgFileSlug_() {
+  return (state.orgSettings.orgName || 'Org').replace(/[^A-Za-z0-9]+/g, '').slice(0, 20) || 'Org';
+}
+function pdfFilename_(view, kind) {
+  return orgFileSlug_() + '_' + kind.replace(/\s+/g, '') + '_' + currentFinYear_(view) + '.pdf';
+}
+function downloadBlob_(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+const PDF_DARK = [17, 17, 17];
+const PDF_HEAD_BG = [242, 242, 242];
+const PDF_HEAD_TEXT = [70, 70, 70];
+const PDF_TOTAL_TEXT = [150, 30, 25];
+const PDF_TOTAL_BG = [247, 247, 247];
+
+/** Flattens BSIE groups into {ac, label, amount, cls} rows for the statement tables. Plain spaces (not unicode) for PDF font safety. */
+function flattenBsieGroupsForPdf_(groups) {
+  const rows = [];
+  groups.forEach(g => {
+    if (g.lines.length <= 1) {
+      rows.push({ ac: g.mapping, label: g.label, amount: g.subtotal, cls: '' });
+    } else {
+      rows.push({ ac: g.mapping, label: g.label, amount: '', cls: 'group' });
+      g.lines.forEach(l => rows.push({ ac: '', label: '    ' + l.acno + '-' + l.acname, amount: l.balance, cls: '' }));
+      rows.push({ ac: '', label: g.label + ' subtotal', amount: g.subtotal, cls: 'subtotal' });
+    }
+  });
+  return rows;
+}
+
+function pdfSectionTitleBar_(doc, y, marginX, usableWidth, title) {
+  doc.setFillColor.apply(doc, PDF_DARK);
+  doc.rect(marginX, y, usableWidth, 6.2, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont(undefined, 'bold'); doc.setFontSize(10.5);
+  doc.text(title, marginX + usableWidth / 2, y + 4.3, { align: 'center' });
+  return y + 6.2 + 3;
+}
+
+function pdfSignatories_(doc, y, marginX, usableWidth) {
+  const labels = state.orgSettings.signatoryLabels;
+  const colW = usableWidth / labels.length;
+  const lineY = y + 16;
+  doc.setDrawColor(60, 60, 60);
+  labels.forEach((label, i) => {
+    const cx = marginX + colW * i;
+    doc.line(cx + 6, lineY, cx + colW - 6, lineY);
+    doc.setFont(undefined, 'bold'); doc.setFontSize(9); doc.setTextColor(20, 20, 20);
+    doc.text(label, cx + colW / 2, lineY + 4.5, { align: 'center' });
+  });
+  return lineY + 10;
+}
+
+/** Draws two statement tables (e.g. Liabilities | Assets) side by side with a shared starting Y so their Total rows line up. */
+function pdfTwoColStatement_(doc, y, marginX, usableWidth, leftHead, leftGroups, leftTotal, rightHead, rightGroups, rightTotal) {
+  const gap = 5;
+  const halfW = (usableWidth - gap) / 2;
+  const acW = 11, amtW = 24;
+  const labelW = halfW - acW - amtW;
+
+  const L = flattenBsieGroupsForPdf_(leftGroups);
+  const R = flattenBsieGroupsForPdf_(rightGroups);
+  const n = Math.max(L.length, R.length, 1);
+  while (L.length < n) L.push({ ac: '', label: '', amount: '', cls: '' });
+  while (R.length < n) R.push({ ac: '', label: '', amount: '', cls: '' });
+
+  function draw(rows, headLabel, total, left) {
+    const body = rows.map(r => [r.ac, r.label, r.amount === '' ? '' : fmt(r.amount)]);
+    doc.autoTable({
+      startY: y,
+      margin: { left: left ? marginX : marginX + halfW + gap },
+      tableWidth: halfW,
+      head: [['AC', headLabel, 'Amount']],
+      body: body,
+      foot: [['', 'Total', fmt(total)]],
+      styles: { fontSize: 7.6, cellPadding: 1.3, overflow: 'linebreak', lineColor: [225, 225, 225], lineWidth: 0.1 },
+      headStyles: { fillColor: PDF_HEAD_BG, textColor: PDF_HEAD_TEXT, fontStyle: 'bold', fontSize: 7 },
+      footStyles: { fillColor: PDF_TOTAL_BG, textColor: PDF_TOTAL_TEXT, fontStyle: 'bold', fontSize: 8, lineWidth: { top: 0.4 } },
+      columnStyles: { 0: { cellWidth: acW, textColor: [90, 90, 90] }, 1: { cellWidth: labelW }, 2: { cellWidth: amtW, halign: 'right' } },
+      theme: 'plain',
+      didParseCell: function (data) {
+        if (data.section === 'body') {
+          const cls = rows[data.row.index] && rows[data.row.index].cls;
+          if (cls === 'group') data.cell.styles.fontStyle = 'bold';
+          if (cls === 'subtotal') { data.cell.styles.fontStyle = 'bold'; data.cell.styles.lineWidth = { top: 0.2 }; }
+        }
+      }
+    });
+    return doc.lastAutoTable.finalY;
+  }
+
+  const yLeft = draw(L, leftHead, leftTotal, true);
+  const yRight = draw(R, rightHead, rightTotal, false);
+  return Math.max(yLeft, yRight) + 6;
+}
+
+function buildBsiePdf_(d) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('p', 'mm', 'a4');
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginX = 10;
+  const usableWidth = pageWidth - marginX * 2;
+
+  let y = 12;
+  doc.setFillColor.apply(doc, PDF_DARK);
+  doc.rect(marginX, y, usableWidth, 9, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFont(undefined, 'bold'); doc.setFontSize(13);
+  doc.text(d.orgName, pageWidth / 2, y + 6, { align: 'center' });
+  y += 9 + 4;
+
+  y = pdfSectionTitleBar_(doc, y, marginX, usableWidth, 'ASSETS AND LIABILITIES AS ON ' + d.asOnDate);
+  y = pdfTwoColStatement_(doc, y, marginX, usableWidth, 'Liabilities', d.liabilities, d.totalLiabilities, 'Assets', d.assets, d.totalAssets);
+
+  y = pdfSectionTitleBar_(doc, y, marginX, usableWidth, 'INCOME AND EXPENDITURE AS ON ' + d.asOnDate);
+  y = pdfTwoColStatement_(doc, y, marginX, usableWidth, 'Expenditure', d.expenditure, d.totalExpenditure, 'Income', d.income, d.totalIncome);
+
+  pdfSignatories_(doc, y, marginX, usableWidth);
+  return doc.output('blob');
+}
+
+function buildLedgerPdf_(d) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('p', 'mm', 'a4');
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const marginX = 10;
+  const usableWidth = pageWidth - marginX * 2;
+
+  function runningHeader() {
+    doc.setFont(undefined, 'normal'); doc.setFontSize(8); doc.setTextColor(130, 130, 130);
+    doc.text(d.finYear + ' LEDGER', marginX, 8);
+    doc.text(new Date().toLocaleDateString('en-GB'), pageWidth - marginX, 8, { align: 'right' });
+  }
+
+  let y = 14;
+  doc.setFillColor.apply(doc, PDF_DARK);
+  doc.rect(marginX, y, usableWidth, 9, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFont(undefined, 'bold'); doc.setFontSize(13);
+  doc.text(d.orgName, pageWidth / 2, y + 6, { align: 'center' });
+  y += 9 + 5;
+  doc.setTextColor(30, 30, 30); doc.setFont(undefined, 'bold'); doc.setFontSize(11);
+  doc.text('LEDGER AS ON ' + d.asOnDate, pageWidth / 2, y, { align: 'center' });
+  y += 9;
+
+  if (!d.accounts.length) {
+    doc.setFont(undefined, 'normal'); doc.setFontSize(10); doc.setTextColor(60, 60, 60);
+    doc.text('No entries for this selection.', marginX, y);
+  }
+
+  d.accounts.forEach(acc => {
+    if (y > pageHeight - 30) { doc.addPage(); y = 14; }
+    doc.setFont(undefined, 'bold'); doc.setFontSize(9.5); doc.setTextColor(20, 20, 20);
+    doc.text(acc.fullacname + '   (Closing: ' + fmt(acc.closingBalance) + ')', marginX, y);
+    y += 3;
+
+    const body = acc.entries.map(e => [
+      e.date, String(e.jrnlNo), e.particulars + (e.details ? (' — ' + e.details) : ''),
+      e.debit ? fmt(e.debit) : '', e.credit ? fmt(e.credit) : '', fmt(e.balance)
+    ]);
+
+    doc.autoTable({
+      startY: y,
+      margin: { left: marginX, right: marginX, top: 12 },
+      head: [['Date', 'Jrnl No', 'Particulars', 'Debit', 'Credit', 'Balance']],
+      body: body,
+      styles: { fontSize: 7.6, cellPadding: 1.3, overflow: 'linebreak', lineColor: [230, 230, 230], lineWidth: 0.1 },
+      headStyles: { fillColor: PDF_HEAD_BG, textColor: PDF_HEAD_TEXT, fontStyle: 'bold', fontSize: 7 },
+      columnStyles: {
+        0: { cellWidth: 20 }, 1: { cellWidth: 15 }, 2: { cellWidth: 'auto' },
+        3: { cellWidth: 22, halign: 'right' }, 4: { cellWidth: 22, halign: 'right' }, 5: { cellWidth: 24, halign: 'right' }
+      },
+      theme: 'plain',
+      didDrawPage: runningHeader
+    });
+    y = doc.lastAutoTable.finalY + 7;
+  });
+
+  if (y > pageHeight - 35) { doc.addPage(); y = 20; }
+  pdfSignatories_(doc, y, marginX, usableWidth);
+
+  if (d.batchLines && d.batchLines.length) {
+    doc.addPage();
+    let by = 14;
+    doc.setFont(undefined, 'bold'); doc.setFontSize(12); doc.setTextColor(20, 20, 20);
+    doc.text('BATCH TRANSACTIONS SUMMARY', pageWidth / 2, by, { align: 'center' });
+    by += 7;
+
+    const batchBody = d.batchLines.map(l => [l.date, String(l.jrnlNo), l.particulars, l.drCr, fmt(l.amount)]);
+    doc.autoTable({
+      startY: by,
+      margin: { left: marginX, right: marginX, top: 12 },
+      head: [['Date', 'Jrnl No', 'Particulars', 'Dr/Cr', 'Amount']],
+      body: batchBody,
+      styles: { fontSize: 7.6, cellPadding: 1.3, overflow: 'linebreak', lineColor: [230, 230, 230], lineWidth: 0.1 },
+      headStyles: { fillColor: PDF_HEAD_BG, textColor: PDF_HEAD_TEXT, fontStyle: 'bold', fontSize: 7 },
+      columnStyles: {
+        0: { cellWidth: 22 }, 1: { cellWidth: 18 }, 2: { cellWidth: 'auto' },
+        3: { cellWidth: 16 }, 4: { cellWidth: 26, halign: 'right' }
+      },
+      theme: 'plain',
+      didDrawPage: runningHeader
+    });
+  }
+
+  return doc.output('blob');
+}
+
+function buildAccountsReportPdf_(d) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('p', 'mm', 'a4');
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginX = 10;
+  const usableWidth = pageWidth - marginX * 2;
+
+  let y = 12;
+  doc.setFillColor.apply(doc, PDF_DARK);
+  doc.rect(marginX, y, usableWidth, 9, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFont(undefined, 'bold'); doc.setFontSize(13);
+  doc.text(d.orgName, pageWidth / 2, y + 6, { align: 'center' });
+  y += 9 + 4;
+  y = pdfSectionTitleBar_(doc, y, marginX, usableWidth, 'ACCOUNTS REPORT — FY ' + d.finYear);
+
+  const body = d.accounts.map(a => [
+    a.acno, a.bsie, a.acname,
+    String(a.debitCount), fmt(a.totalDebits),
+    String(a.creditCount), fmt(a.totalCredits),
+    fmt(a.balance)
+  ]);
+
+  doc.autoTable({
+    startY: y,
+    margin: { left: marginX, right: marginX },
+    head: [['AC', 'BSIE', 'Name', 'Dr Count', 'Total Debits', 'Cr Count', 'Total Credits', 'Balance']],
+    body: body,
+    styles: { fontSize: 7.6, cellPadding: 1.3, overflow: 'linebreak', lineColor: [230, 230, 230], lineWidth: 0.1 },
+    headStyles: { fillColor: PDF_HEAD_BG, textColor: PDF_HEAD_TEXT, fontStyle: 'bold', fontSize: 7 },
+    columnStyles: {
+      0: { cellWidth: 13 }, 1: { cellWidth: 13 }, 2: { cellWidth: 'auto' },
+      3: { cellWidth: 15, halign: 'right' }, 4: { cellWidth: 24, halign: 'right' },
+      5: { cellWidth: 15, halign: 'right' }, 6: { cellWidth: 24, halign: 'right' }, 7: { cellWidth: 24, halign: 'right' }
+    },
+    theme: 'plain'
+  });
+
+  return doc.output('blob');
+}
+
+function getPdfBlob_(view) {
+  if (view === 'bsie') {
+    if (!state.lastBsie) return Promise.reject(new Error('Report not loaded yet'));
+    return Promise.resolve(buildBsiePdf_(state.lastBsie));
+  }
+  if (view === 'accountsReport') {
+    if (!state.lastAccountsReport) return Promise.reject(new Error('Report not loaded yet'));
+    return Promise.resolve(buildAccountsReportPdf_(state.lastAccountsReport));
+  }
+  if (!state.lastLedger) return Promise.reject(new Error('Report not loaded yet'));
+  return Promise.resolve(buildLedgerPdf_(state.lastLedgerAcno === 'ALL' ? state.lastLedger : Object.assign({}, state.lastLedger, { batchLines: [] })));
+}
+
+function savePdf(view, kind) {
+  toast('Preparing PDF…');
+  getPdfBlob_(view)
+    .then(blob => { downloadBlob_(blob, pdfFilename_(view, kind)); toast('PDF saved to your device.'); })
+    .catch(err => toast('Could not generate PDF: ' + (err.message || err), true));
+}
+
+function shareWhatsAppPdf(view, kind) {
+  toast('Preparing PDF…');
+  getPdfBlob_(view).then(blob => {
+    const filename = pdfFilename_(view, kind);
+    const file = new File([blob], filename, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      // Opens the OS share sheet with the PDF genuinely attached; picking WhatsApp there lets the
+      // person choose the recipient inside WhatsApp with the file already attached.
+      return navigator.share({ files: [file], title: state.orgSettings.orgName + ' ' + kind, text: state.orgSettings.orgName + ' ' + kind + ' — FY ' + currentFinYear_(view) }).catch(() => {});
+    }
+    downloadBlob_(blob, filename);
+    toast('WhatsApp attach not supported here — PDF saved instead.');
+  }).catch(err => toast('Could not generate PDF: ' + (err.message || err), true));
+}
+
+// ---------------------------------------------------------------------
+// Misc
+// ---------------------------------------------------------------------
+function showError(containerId, err) {
+  document.getElementById(containerId).innerHTML = '<div class="card msg-error">' + escapeHtml(err.message || err) + '</div>';
+}
+
+function boot_() {
+  apiGet('orgSettings').then(s => {
+    state.orgSettings = s;
+    document.title = s.orgName;
+    document.getElementById('orgHeaderName').innerText = s.orgName;
+    document.getElementById('navOrgName').innerText = s.orgName;
+  }).catch(() => {
+    // Settings sheet missing/unreachable — fall back to the defaults already in state.orgSettings.
+  }).then(router);
+}
+boot_();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
