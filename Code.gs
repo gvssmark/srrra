@@ -228,9 +228,14 @@ function getAccountsList_() {
   const col = headerMap_(values);
   const list = [];
   for (let i = 1; i < values.length; i++) {
-    if (values[i][col['fullacname']]) list.push(String(values[i][col['fullacname']]));
+    const fullacname = values[i][col['fullacname']];
+    if (fullacname) list.push(String(fullacname));
   }
-  return list.sort();
+  // Sort by the numeric acno prefix (everything before the first '-'), not plain string order —
+  // account numbers can now be 4-7 digits, so string sort no longer matches numeric order
+  // (e.g. "1000203" would otherwise sort before "1001").
+  list.sort((a, b) => Number(a.split('-')[0]) - Number(b.split('-')[0]));
+  return list;
 }
 
 function getAllAccounts_() {
@@ -427,6 +432,9 @@ function getNextAcno(type) {
   const prefix = TYPE_PREFIX[type];
   if (!prefix) throw new Error('Unknown account type: ' + type);
 
+  // Deliberately only considers 4-digit codes: account numbers can be 4-7 digits, but an
+  // auto-incremented suggestion only makes sense within the standard 4-digit pool — a longer,
+  // structured code (e.g. type + tower + floor + flat) isn't something to sequentially continue.
   const values = getAccountsSheet_().getDataRange().getValues();
   const col = headerMap_(values);
   let max = 0;
@@ -449,8 +457,8 @@ function submitAccountEntry(entry) {
   const bsieInfo = getBsieCodeInfo_(entry.bsie); // throws if unknown code
   const type = bsieInfo.typeKey;
 
-  if (!/^[1-4]\d{3}$/.test(entry.acno)) {
-    throw new Error('Account number must be 4 digits, first digit 1-4 (1=Asset,2=Liability,3=Payment,4=Receipt)');
+  if (!/^[1-4]\d{3,6}$/.test(entry.acno)) {
+    throw new Error('Account number must be 4 to 7 digits, first digit 1-4 (1=Asset,2=Liability,3=Payment,4=Receipt)');
   }
   if (entry.acno.charAt(0) !== TYPE_PREFIX[type]) {
     throw new Error('Account number ' + entry.acno + ' should start with ' + TYPE_PREFIX[type] +
@@ -534,7 +542,7 @@ function getAccountsReport(finYear) {
 
   const result = accounts
     .slice()
-    .sort((a, b) => a.acno.localeCompare(b.acno))
+    .sort((a, b) => Number(a.acno) - Number(b.acno))
     .map(a => {
       const bal = balances[a.fullacname];
       const cnt = counts[a.fullacname];
@@ -573,7 +581,7 @@ function getLedgerData(finYear, acnoOrAll) {
   });
 
   const targets = (acnoOrAll === 'ALL')
-    ? accounts.slice().sort((a, b) => a.acno.localeCompare(b.acno))
+    ? accounts.slice().sort((a, b) => Number(a.acno) - Number(b.acno))
     : accounts.filter(a => a.fullacname === acnoOrAll);
 
   const result = targets.map(acc => {

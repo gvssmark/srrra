@@ -240,7 +240,7 @@
 // ==========================================================================
 // Configure this
 // ==========================================================================
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzZ3KXSohAMAzYebJD8MltNSGnlbxFasR78cSE-b4MRQvgtaWfr37SnpDT7XoswO6bz/exec';
+const WEB_APP_URL = 'PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
 // ==========================================================================
 
 const state = { finYears: [], accounts: [], bsieCodes: [], lastBsie: null, lastLedger: null, lastLedgerAcno: null, lastAccountsReport: null, orgSettings: { orgName: 'Organization', fyStartMonth: 7, signatoryLabels: ['President', 'General Secretary', 'Treasurer', 'Auditor'] } };
@@ -676,8 +676,8 @@ function renderAccount() {
       '<label>BSIE Mapping</label>' +
       '<select id="a_bsie" onchange="onBsieChange()"><option value="">Select…</option>' + options + '</select>' +
       '<div class="row">' +
-        '<div><label>Account No.</label><input id="a_acno" maxlength="4" oninput="updateAcctPreview()">' +
-          '<div class="hint">4 digits — auto-suggested, editable</div></div>' +
+        '<div><label>Account No.</label><input id="a_acno" maxlength="7" inputmode="numeric" oninput="onAcnoInput_()">' +
+          '<div class="hint">4-7 digits — auto-suggested (4-digit), editable for longer codes</div></div>' +
       '</div>' +
       '<label>Account Name</label><input id="a_acname" oninput="updateAcctPreview()">' +
       '<div class="hint" style="margin-top:16px;padding:9px;background:#f3f3f3;border-radius:5px;" id="a_preview">Full account name will appear here</div>' +
@@ -694,6 +694,12 @@ function onBsieChange() {
     document.getElementById('a_acno').value = d.acno;
     updateAcctPreview();
   }).catch(err => document.getElementById('a_error').innerText = err.message || err);
+}
+function onAcnoInput_() {
+  const el = document.getElementById('a_acno');
+  const digitsOnly = el.value.replace(/\D/g, '').slice(0, 7);
+  if (digitsOnly !== el.value) el.value = digitsOnly;
+  updateAcctPreview();
 }
 function updateAcctPreview() {
   const acno = document.getElementById('a_acno').value.trim();
