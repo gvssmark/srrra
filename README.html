@@ -66,6 +66,14 @@
 
   <h3>Accounts</h3>
   <pre>acno | bsie | type | acname | fullacname</pre>
+  <ul>
+    <li><code>acno</code> is <strong>4 to 7 digits, numeric only</strong>. The first digit is fixed
+      by type (<code>1</code>=Asset, <code>2</code>=Liability, <code>3</code>=Payment/Expenditure,
+      <code>4</code>=Receipt/Income); the remaining 3-6 digits are free-form — e.g. a structured
+      code like tower+floor+flat for per-unit accounts (apartment complex use case). The "suggest
+      next number" feature on the Account Addition screen only auto-increments within the standard
+      4-digit pool; longer, structured codes are typed in directly.</li>
+  </ul>
 
   <h3>BSIEcodes</h3>
   <pre>Type | mapping | Label</pre>
@@ -107,6 +115,22 @@
     <li>Share the resulting URL (e.g. <code>https://yourname.github.io/repo/</code>).</li>
     <li>On a phone: open the link &gt; browser menu &gt; <strong>Add to Home Screen / Install app</strong>.</li>
   </ol>
+
+  <h3>After making changes later</h3>
+  <p>
+    These two update mechanisms are independent — a change to one file never requires touching the
+    other, but each file has to be pushed out its own way:
+  </p>
+  <table>
+    <tr><th>You changed...</th><th>What to do</th><th>Touch the other file?</th></tr>
+    <tr><td><code>Code.gs</code></td><td><strong>Deploy &gt; Manage deployments &gt; ✎ Edit &gt; New version &gt; Deploy</strong> (same <code>/exec</code> URL keeps working)</td><td>No — <code>index.html</code>'s <code>WEB_APP_URL</code> doesn't change</td></tr>
+    <tr><td><code>index.html</code> (or <code>manifest.json</code>/<code>icon.svg</code>/<code>sw.js</code>)</td><td>Just push the updated file(s) to GitHub — Pages picks it up automatically</td><td>No Apps Script redeploy needed</td></tr>
+  </table>
+  <p>
+    If a piece of work touched both files (as most feature additions do — a new report needs a new
+    backend action <em>and</em> new frontend code to call it), do <strong>both</strong> steps above;
+    neither one alone is enough.
+  </p>
 
   <h2>4. Migration (old schema → new schema)</h2>
   <p>Only needed once, if your Journal sheet still has <code>drAccount</code>/<code>crAccount</code> columns.</p>

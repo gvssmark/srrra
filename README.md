@@ -35,6 +35,13 @@ date | jrnlNo | account | drCr | details | amount | finYear
 ```
 acno | bsie | type | acname | fullacname
 ```
+- `acno` is **4 to 7 digits, numeric only**. The first digit is fixed by
+  type (`1`=Asset, `2`=Liability, `3`=Payment/Expenditure, `4`=Receipt/Income);
+  the remaining 3-6 digits are free-form — e.g. a structured code like
+  tower+floor+flat for per-unit accounts (apartment complex use case).
+  The "suggest next number" feature on the Account Addition screen only
+  auto-increments within the standard 4-digit pool; longer, structured codes
+  are typed in directly.
 
 **BSIEcodes**
 ```
@@ -75,6 +82,20 @@ New version > Deploy** (same `/exec` URL keeps working).
 3. Enable **GitHub Pages** (Settings > Pages > deploy from branch).
 4. Share the resulting URL (e.g. `https://yourname.github.io/repo/`).
 5. On a phone: open the link > browser menu > **Add to Home Screen / Install app**.
+
+### After making changes later
+
+These two update mechanisms are independent — a change to one file never
+requires touching the other, but each file has to be pushed out its own way:
+
+| You changed... | What to do | Do you need to touch the other file? |
+|---|---|---|
+| `Code.gs` | **Deploy > Manage deployments > ✎ Edit > New version > Deploy** (same `/exec` URL keeps working) | No — `index.html`'s `WEB_APP_URL` doesn't change |
+| `index.html` (or `manifest.json`/`icon.svg`/`sw.js`) | Just push the updated file(s) to GitHub — Pages picks it up automatically | No Apps Script redeploy needed |
+
+If a piece of work touched both files (as most feature additions do — a new
+report needs a new backend action *and* new frontend code to call it), do
+**both** steps above; neither one alone is enough.
 
 ## 4. Migration (old schema → new schema)
 
